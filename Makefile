@@ -1,23 +1,28 @@
-# Makefile
-
-CC = nvcc
-CXX = g++
-CXXFLAGS = -O3 -std=c++11
-CUDAFLAGS = -arch=sm_35
+NVCC = nvcc
+CXXFLAGS = -std=c++14 -O2
+CUDAFLAGS = -arch=sm_70 -rdc=true
 INCLUDES = -Iinclude -Isrc
-SRC = $(wildcard src/**/*.cu)
-OBJ = $(SRC:.cu=.o)
-TARGET = transformer
 
-all: $(TARGET)
+# Directorios
+SRCDIR = src
+BUILDDIR = build
+SOURCES = $(shell find $(SRCDIR) -name "*.cu")
+OBJECTS = $(SOURCES:$(SRCDIR)/%.cu=$(BUILDDIR)/%.o)
 
-$(TARGET): $(OBJ)
-	$(CC) $(CUDAFLAGS) $(OBJ) -o $@
+# Targets
+all: test_simple transformer
 
-%.o: %.cu
-	$(CC) $(CUDAFLAGS) $(INCLUDES) -c $< -o $@
+test_simple: test_simple.cu
+    $(NVCC) $(CUDAFLAGS) $(INCLUDES) $< -o $@
+
+transformer: $(OBJECTS)
+    $(NVCC) $(CUDAFLAGS) $(OBJECTS) -o $@
+
+$(BUILDDIR)/%.o: $(SRCDIR)/%.cu
+    @mkdir -p $(dir $@)
+    $(NVCC) $(CUDAFLAGS) $(INCLUDES) -c $< -o $@
 
 clean:
-	rm -f $(OBJ) $(TARGET)
+    rm -rf $(BUILDDIR) test_simple transformer
 
 .PHONY: all clean
