@@ -12,16 +12,15 @@ private:
     bool on_device;
 
 public:
-    __host__ __device__ Matrix(int rows, int cols);
-    __host__ __device__ Matrix(int rows, int cols, float init_val);
-    __host__ __device__ ~Matrix();
+    __host__ Matrix(int rows, int cols);
+    __host__ Matrix(int rows, int cols, float init_val);
+    __host__ ~Matrix();
 
     // Copy constructor and assignment
-    __host__ __device__ Matrix(const Matrix &other);
-    __host__ __device__ Matrix &operator=(const Matrix &other);
+    __host__ Matrix(const Matrix &other);
+    __host__ Matrix &operator=(const Matrix &other);
 
     // Basic operations
-    __host__ void initialize(float value = 0.0f);
     __host__ void copyFromHost(const std::vector<float> &hostData);
     __host__ void copyToHost(std::vector<float> &hostData) const;
 
@@ -31,13 +30,12 @@ public:
     __host__ __device__ float *getData() const { return data; }
 
     // Matrix operations
-    __host__ __device__ Matrix add(const Matrix &other) const;
-    __host__ __device__ Matrix multiply(const Matrix &other) const;
-    __host__ __device__ Matrix scale(float scalar) const;
+    __host__ Matrix add(const Matrix &other) const;
+    __host__ Matrix multiply(const Matrix &other) const;
 
     // Element access
-    __host__ __device__ float &operator()(int row, int col);
-    __host__ __device__ const float &operator()(int row, int col) const;
+    __host__ float getElement(int row, int col) const;
+    __host__ void setElement(int row, int col, float value);
 };
 
 #endif // MATRIX_CUH

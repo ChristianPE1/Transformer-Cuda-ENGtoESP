@@ -2,6 +2,8 @@
 #include <cuda_runtime.h>
 #include "data/dataset.cuh"
 #include "data/vocab.cuh"
+#include "transformer/transformer.cuh"
+#include "utils/matrix.cuh"
 
 int main()
 {
@@ -39,8 +41,8 @@ int main()
 
         // Test vocabulary
         std::cout << "\n=== Vocabulary Test ===" << std::endl;
-        auto eng_vocab = dataset.getEngVocab();
-        auto spa_vocab = dataset.getSpaVocab();
+        const auto &eng_vocab = dataset.getEngVocab();
+        const auto &spa_vocab = dataset.getSpaVocab();
 
         // Test English sentence
         std::string test_eng = "<sos> hello world <eos>";
@@ -69,49 +71,51 @@ int main()
 
         for (size_t i = 0; i < batch.size(); ++i)
         {
-            auto [eng_ids, spa_ids] = batch[i];
+            const auto &sample = batch[i];
+            const auto &eng_ids = sample.first;
+            const auto &spa_ids = sample.second;
             std::cout << "Sample " << i << ":" << std::endl;
             std::cout << "  ENG: " << eng_vocab.idsToSentence(eng_ids) << std::endl;
             std::cout << "  SPA: " << spa_vocab.idsToSentence(spa_ids) << std::endl;
         }
 
         std::cout << "\n=== Success! Dataset ready for training ===" << std::endl;
+
+        // Test Transformer
+        std::cout << "\n=== Testing Transformer ===" << std::endl;
+        Transformer transformer(dataset.getEngVocab().size(),
+                                dataset.getSpaVocab().size(),
+                                128,  // d_model
+                                4,    // n_heads
+                                2,    // n_layers
+                                256); // d_ff
+
+        // Test forward pass
+        auto test_batch = dataset.getBatch(1, true);
+        if (!test_batch.empty())
+        {
+            const auto &sample = test_batch[0];
+            const auto &source_ids = sample.first;
+            const auto &target_ids = sample.second;
+
+            std::cout << "Testing forward pass with:" << std::endl;
+            std::cout << "  Source: " << eng_vocab.idsToSentence(source_ids) << std::endl;
+            std::cout << "  Target: " << spa_vocab.idsToSentence(target_ids) << std::endl;
+
+            Matrix output = transformer.forward(source_ids, target_ids);
+            std::cout << "Forward pass completed!" << std::endl;
+            std::cout << "Output shape: " << output.getRows() << "x" << output.getCols() << std::endl;
+
+            // Test generation
+            std::cout << "\nTesting generation..." << std::endl;
+            auto generated = transformer.generate(source_ids, 2, 3, 10); // sos=2, eos=3
+            std::cout << "Generated: " << spa_vocab.idsToSentence(generated) << std::endl;
+        }
     }
     catch (const std::exception &e)
     {
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;
-    }
-
-    // Test Transformer
-    std::cout << "\n=== Testing Transformer ===" << std::endl;
-    Transformer transformer(dataset.getEngVocab().size(),
-                            dataset.getSpaVocab().size(),
-                            128,  // d_model
-                            4,    // n_heads (not used yet)
-                            2,    // n_layers (not used yet)
-                            256); // d_ff (not used yet)
-
-    // Test forward pass
-    auto test_batch = dataset.getBatch(1, true);
-    if (!test_batch.empty())
-    {
-        const auto &sample = test_batch[0];
-        const auto &source_ids = sample.first;
-        const auto &target_ids = sample.second;
-
-        std::cout << "Testing forward pass with:" << std::endl;
-        std::cout << "  Source: " << eng_vocab.idsToSentence(source_ids) << std::endl;
-        std::cout << "  Target: " << spa_vocab.idsToSentence(target_ids) << std::endl;
-
-        Matrix output = transformer.forward(source_ids, target_ids);
-        std::cout << "Forward pass completed!" << std::endl;
-        std::cout << "Output shape: " << output.getRows() << "x" << output.getCols() << std::endl;
-
-        // Test generation
-        std::cout << "\nTesting generation..." << std::endl;
-        auto generated = transformer.generate(source_ids, 2, 3, 10); // sos=2, eos=3
-        std::cout << "Generated: " << spa_vocab.idsToSentence(generated) << std::endl;
     }
 
     return 0;
