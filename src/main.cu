@@ -83,5 +83,36 @@ int main()
         return 1;
     }
 
+    // Test Transformer
+    std::cout << "\n=== Testing Transformer ===" << std::endl;
+    Transformer transformer(dataset.getEngVocab().size(),
+                            dataset.getSpaVocab().size(),
+                            128,  // d_model
+                            4,    // n_heads (not used yet)
+                            2,    // n_layers (not used yet)
+                            256); // d_ff (not used yet)
+
+    // Test forward pass
+    auto test_batch = dataset.getBatch(1, true);
+    if (!test_batch.empty())
+    {
+        const auto &sample = test_batch[0];
+        const auto &source_ids = sample.first;
+        const auto &target_ids = sample.second;
+
+        std::cout << "Testing forward pass with:" << std::endl;
+        std::cout << "  Source: " << eng_vocab.idsToSentence(source_ids) << std::endl;
+        std::cout << "  Target: " << spa_vocab.idsToSentence(target_ids) << std::endl;
+
+        Matrix output = transformer.forward(source_ids, target_ids);
+        std::cout << "Forward pass completed!" << std::endl;
+        std::cout << "Output shape: " << output.getRows() << "x" << output.getCols() << std::endl;
+
+        // Test generation
+        std::cout << "\nTesting generation..." << std::endl;
+        auto generated = transformer.generate(source_ids, 2, 3, 10); // sos=2, eos=3
+        std::cout << "Generated: " << spa_vocab.idsToSentence(generated) << std::endl;
+    }
+
     return 0;
 }

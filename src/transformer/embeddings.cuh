@@ -1,22 +1,38 @@
-// filepath: cuda-transformer/cuda-transformer/src/transformer/embeddings.cuh
-#ifndef EMBEDDINGS_H
-#define EMBEDDINGS_H
+#ifndef EMBEDDINGS_CUH
+#define EMBEDDINGS_CUH
 
 #include <cuda_runtime.h>
-#include "common.cuh"
+#include <vector>
+#include "../utils/matrix.cuh"
 
-class Embedding {
+class Embedding
+{
 private:
     size_t vocab_size;
     size_t d_model;
-    float* weights; // Pointer to weights on device
+    float *weights; // Device pointer
 
 public:
     Embedding(size_t vocab_size, size_t d_model);
     ~Embedding();
 
     void initializeWeights();
-    __device__ float* forward(const int* input_tokens, size_t seq_len);
+    Matrix forward(const std::vector<int> &input_tokens);
 };
 
-#endif // EMBEDDINGS_H
+class PositionalEncoding
+{
+private:
+    size_t d_model;
+    size_t max_len;
+    float *pos_encodings; // Device pointer
+
+public:
+    PositionalEncoding(size_t d_model, size_t max_len = 512);
+    ~PositionalEncoding();
+
+    void initializeEncodings();
+    Matrix getEncoding(int seq_len);
+};
+
+#endif // EMBEDDINGS_CUH

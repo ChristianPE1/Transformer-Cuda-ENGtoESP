@@ -1,54 +1,50 @@
-// mask_utils.cuh
-#ifndef MASK_UTILS_CUH
-#define MASK_UTILS_CUH
+#ifndef MATRIX_CUH
+#define MATRIX_CUH
 
 #include <cuda_runtime.h>
-#include "matrix.cuh"
+#include <vector>
 
-class MaskUtils
+class Matrix
 {
+private:
+    float *data;
+    int rows, cols;
+    bool on_device;
+
 public:
-    // Create padding mask (1 where there are real tokens, 0 where there is padding)
-    static __device__ Matrix createPaddingMask(const int *tokens, size_t seq_len, int pad_token = 0)
+    __host__ Matrix(int rows, int cols);
+    __host__ Matrix(int rows, int cols, float init_val);
+    __host__ ~Matrix();
+
+    // Copy constructor and assignment
+    __host__ Matrix(const Matrix &other);
+    __host__ Matrix &operator=(const Matrix &other);
+
+    // Basic operations
+    __host__ void copyFromHost(const std::vector<float> &hostData);
+    __host__ void copyToHost(std::vector<float> &hostData) const;
+
+    // Getters
+    __host__ __device__ int getRows() const { return rows; }
+    __host__ __device__ int getCols() const { return cols; }
+    __host__ __device__ float *getData() const { return data; }
+
+    // Matrix operations
+    __host__ Matrix add(const Matrix &other) const;
+    __host__ Matrix multiply(const Matrix &other) const;
+
+    // Element access (for debugging)
+    __host__ float getElement(int row, int col) const
     {
-        Matrix mask(1, seq_len);
-        for (size_t i = 0; i < seq_len; ++i)
-        {
-            mask(0, i) = (tokens[i] == pad_token) ? 0.0 : 1.0;
-        }
-        return mask;
+        float value;
+        cudaMemcpy(&value, &data[row * cols + col], sizeof(float), cudaMemcpyDeviceToHost);
+        return value;
     }
 
-    // Create look-ahead mask (lower triangular) for the decoder
-    static __device__ Matrix createLookAheadMask(size_t seq_len)
+    __host__ void setElement(int row, int col, float value)
     {
-        Matrix mask(seq_len, seq_len, 0.0);
-        for (size_t i = 0; i < seq_len; ++i)
-        {
-            for (size_t j = 0; j <= i; ++j)
-            {
-                mask(i, j) = 1.0;
-            }
-        }
-        return mask;
-    }
-
-    // Combine padding and look-ahead masks for the decoder
-    static __device__ Matrix combineDecoderMasks(const int *tokens, size_t seq_len, int pad_token = 0)
-    {
-        Matrix look_ahead = createLookAheadMask(seq_len);
-        Matrix padding_mask = createPaddingMask(tokens, seq_len, pad_token);
-
-        for (size_t i = 0; i < seq_len; ++i)
-        {
-            for (size_t j = 0; j < seq_len; ++j)
-            {
-                look_ahead(i, j) *= padding_mask(0, j);
-            }
-        }
-
-        return look_ahead;
+        cudaMemcpy(&data[row * cols + col], &value, sizeof(float), cudaMemcpyHostToDevice);
     }
 };
 
-#endif // MASK_UTILS_CUH
+#endif // MATRIX_CUH
