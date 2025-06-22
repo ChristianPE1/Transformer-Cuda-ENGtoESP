@@ -48,11 +48,25 @@ __global__ void multiHeadAttentionKernel(float* queries, float* keys, float* val
     }
 }
 
-Matrix MultiHeadAttention::forward(float* queries, float* keys, float* values, 
-                                  float* output, int seq_length) {
+Matrix MultiHeadAttention::forward(const Matrix &query, const Matrix &key, const Matrix &value, const Matrix &mask) {
+    int seq_length = query.getRows();
+    int d_model = query.getCols();
+
+    Matrix output(seq_length, d_model);
+
+    // Llama al kernel usando los datos de los Matrix
     int blockSize = 256;
     int numBlocks = (seq_length + blockSize - 1) / blockSize;
-    multiHeadAttentionKernel<<<numBlocks, blockSize>>>(queries, keys, values, output, 
-                                                       d_model, n_heads, seq_length);
+    multiHeadAttentionKernel<<<numBlocks, blockSize>>>(
+        query.getData(),
+        key.getData(),
+        value.getData(),
+        output.getData(),
+        d_model,
+        n_heads,
+        seq_length
+    );
     cudaDeviceSynchronize();
+
+    return output;
 }
