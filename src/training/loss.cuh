@@ -18,10 +18,12 @@ public:
         double loss = 0.0;
         int batch_size = predictions.getRows();
         int num_classes = predictions.getCols();
+        const float* pred_data = predictions.getData();
+        const float* targ_data = targets.getData();
 
         for (int i = 0; i < batch_size; ++i) {
             for (int j = 0; j < num_classes; ++j) {
-                loss -= targets[i][j] * log(predictions[i][j] + 1e-10); // Adding epsilon to prevent log(0)
+                loss -= targ_data[i * num_classes + j] * log(pred_data[i * num_classes + j] + 1e-10);
             }
         }
         return loss / batch_size;
@@ -31,13 +33,20 @@ public:
         int batch_size = predictions.getRows();
         int num_classes = predictions.getCols();
         Matrix grad(batch_size, num_classes);
+        float* grad_data = grad.getData();
+        const float* pred_data = predictions.getData();
+        const float* targ_data = targets.getData();
 
         for (int i = 0; i < batch_size; ++i) {
             for (int j = 0; j < num_classes; ++j) {
-                grad[i][j] = predictions[i][j] - targets[i][j];
+                grad_data[i * num_classes + j] = pred_data[i * num_classes + j] - targ_data[i * num_classes + j];
             }
         }
-        return grad / batch_size;
+        // Divide manualmente
+        for (int i = 0; i < batch_size * num_classes; ++i) {
+            grad_data[i] /= batch_size;
+        }
+        return grad;
     }
 };
 
