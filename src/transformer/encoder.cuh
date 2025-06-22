@@ -20,15 +20,11 @@ public:
           norm1(d_model), 
           norm2(d_model) {}
 
-    __device__ Matrix forward(const Matrix &input, const Matrix *src_mask = nullptr) {
-        // Masked self-attention
-        Matrix self_att_output = self_attention.forward(input, input, input, src_mask);
+    Matrix forward(const Matrix &input, const Matrix *src_mask = nullptr) {
+        Matrix self_att_output = self_attention.forward(input, input, input, src_mask ? *src_mask : Matrix());
         Matrix norm1_output = norm1.forward(input.add(self_att_output));
-
-        // Feed-forward
         Matrix ff_output = feed_forward.forward(norm1_output);
         Matrix norm2_output = norm2.forward(norm1_output.add(ff_output));
-
         return norm2_output;
     }
 };

@@ -17,15 +17,12 @@ __device__ Matrix EncoderLayer::forward(const Matrix &input, const Matrix &src_m
     return norm2_output;
 }
 
-EncoderLayer::EncoderLayer(size_t d_model, size_t n_heads, size_t d_ff)
-    : self_attention(d_model, n_heads), feed_forward(d_model, d_ff),
-      norm1(d_model), norm2(d_model) {}
 
 // Kernel function to launch multiple encoder layers
 __global__ void encodeKernel(Matrix *input, Matrix *output, Matrix *src_mask, EncoderLayer *layers, size_t n_layers) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < n_layers) {
-        output[idx] = layers[idx].forward(input[idx], src_mask[idx]);
+        output[idx] = layers[idx].forward(input[idx], &src_mask[idx]);
     }
 }
 
