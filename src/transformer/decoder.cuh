@@ -24,8 +24,8 @@ public:
           norm1(d_model), norm2(d_model), norm3(d_model),
           d_model(d_model) {}
 
-    __device__ Matrix forward(const Matrix &input, const Matrix &encoder_output,
-                              const Matrix &target_mask, const Matrix *src_mask = nullptr);
+    Matrix forward(const Matrix &input, const Matrix &encoder_output,
+                   const Matrix &target_mask, const Matrix *src_mask = nullptr);
 };
 
 #endif // DECODER_H

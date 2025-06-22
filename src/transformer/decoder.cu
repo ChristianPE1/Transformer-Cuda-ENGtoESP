@@ -5,7 +5,7 @@
 #include "../layers/layer_norm.cuh"
 #include "utils/cuda_utils.cuh"
 
-__device__ Matrix DecoderLayer::forward(const Matrix &input, const Matrix &encoder_output,const Matrix &target_mask, const Matrix *src_mask) {
+Matrix DecoderLayer::forward(const Matrix &input, const Matrix &encoder_output, const Matrix &target_mask, const Matrix *src_mask) {
     // Masked self-attention
     Matrix self_att_output = masked_self_attention.forward(input, input, input, target_mask);
     Matrix norm1_output = norm1.forward(input.add(self_att_output));
