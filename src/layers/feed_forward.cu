@@ -57,3 +57,16 @@ Matrix FeedForward::forward(const Matrix &input) {
 
     return output;
 }
+
+FeedForward::FeedForward(size_t d_model, size_t d_ff) 
+    : d_model(d_model), d_ff(d_ff), W1(d_model, d_ff), W2(d_ff, d_model) {
+    // Alocar memoria para b1 y b2
+    cudaMalloc(&b1, d_ff * sizeof(float));
+    cudaMalloc(&b2, d_model * sizeof(float));
+    initializeWeights();
+}
+
+FeedForward::~FeedForward() {
+    if (b1) cudaFree(b1);
+    if (b2) cudaFree(b2);
+}

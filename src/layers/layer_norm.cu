@@ -2,8 +2,7 @@
 #include "layer_norm.cuh"
 #include <cuda_runtime.h>
 
-__global__ void layer_norm_kernel(float *input, float *output, float *gamma, float *beta, 
-                                   int N, int D, float epsilon) {
+__global__ void layer_norm_kernel(float *input, float *output, float *gamma, float *beta, int N, int D, float epsilon) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < N) {
         float mean = 0.0f;
@@ -48,4 +47,9 @@ Matrix LayerNorm::forward(const Matrix &input) {
     cudaDeviceSynchronize();
 
     return output;
+}
+
+LayerNorm::LayerNorm(size_t d_model, double epsilon) 
+    : d_model(d_model), epsilon(epsilon), gamma(1, d_model, 1.0f), beta(1, d_model, 0.0f) {
+    // Constructor ya implementado con inicialización de gamma y beta
 }

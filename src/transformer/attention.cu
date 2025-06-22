@@ -75,3 +75,15 @@ Matrix MultiHeadAttention::forward(const Matrix &query, const Matrix &key, const
 
     return output;
 }
+
+MultiHeadAttention::MultiHeadAttention(size_t d_model, size_t n_heads) 
+    : d_model(d_model), n_heads(n_heads) {
+    d_k = d_model / n_heads;
+    d_v = d_model / n_heads;
+    // Inicializar matrices W_Q, W_K, W_V, W_O si las tienes
+}
+
+MultiHeadAttention::~MultiHeadAttention() {
+    // Liberar memoria si es necesario
+    
+}
