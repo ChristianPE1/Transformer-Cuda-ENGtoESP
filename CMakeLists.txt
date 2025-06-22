@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 3.18)
+cmake_policy(SET CMP0048 NEW)
 project(CudaTransformer VERSION 1.0 LANGUAGES CXX CUDA)
 
 set(CMAKE_CUDA_STANDARD 14)
