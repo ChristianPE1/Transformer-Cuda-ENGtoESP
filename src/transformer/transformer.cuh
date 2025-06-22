@@ -32,6 +32,7 @@ public:
     std::vector<int> generate(const std::vector<int> &source_tokens,
                               int sos_token = 2, int eos_token = 3,
                               size_t max_length = 50);
+    size_t getTargetVocabSize() const { return target_vocab_size; }
 };
 
 #endif // TRANSFORMER_CUH

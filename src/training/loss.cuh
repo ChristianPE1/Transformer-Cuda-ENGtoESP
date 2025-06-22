@@ -8,15 +8,15 @@
 
 class Loss {
 public:
-    __device__ virtual double forward(const Matrix& predictions, const Matrix& targets) = 0;
-    __device__ virtual Matrix backward(const Matrix& predictions, const Matrix& targets) = 0;
+    virtual double forward(const Matrix& predictions, const Matrix& targets) = 0;
+    virtual Matrix backward(const Matrix& predictions, const Matrix& targets) = 0;
 
     void calculateCrossEntropy(const float* predictions, const int* targets, float* loss, int num_classes, int batch_size);
 };
 
 class CrossEntropyLoss : public Loss {
 public:
-    __device__ double forward(const Matrix& predictions, const Matrix& targets) override {
+    double forward(const Matrix& predictions, const Matrix& targets) override {
         double loss = 0.0;
         int batch_size = predictions.getRows();
         int num_classes = predictions.getCols();
@@ -31,7 +31,7 @@ public:
         return loss / batch_size;
     }
 
-    __device__ Matrix backward(const Matrix& predictions, const Matrix& targets) override {
+    Matrix backward(const Matrix& predictions, const Matrix& targets) override {
         int batch_size = predictions.getRows();
         int num_classes = predictions.getCols();
         Matrix grad(batch_size, num_classes);
