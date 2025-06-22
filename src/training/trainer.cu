@@ -1,46 +1,18 @@
 // filepath: cuda-transformer/cuda-transformer/src/training/trainer.cu
 #include "trainer.cuh"
-#include "../transformer/transformer.cuh"
-#include "../data/dataset.cuh"
-#include "../training/loss.cuh"
-#include "../training/optimizer.cuh"
 #include <iostream>
 
-__global__ void trainKernel(Transformer transformer, Dataset dataset, Optimizer optimizer, Loss lossFunction, int num_epochs) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx < dataset.size()) {
-        // Load input and target sequences
-        auto input = dataset.getInput(idx);
-        auto target = dataset.getTarget(idx);
-
-        // Forward pass
-        Matrix output = transformer.forward(input, target);
-
-        // Compute loss
-        float loss = lossFunction.calculate(output, target);
-
-        // Backward pass and optimization
-        optimizer.step(transformer, loss);
-    }
-}
-
-void Trainer::train(Transformer &transformer, Dataset &dataset, Optimizer &optimizer, Loss &lossFunction, int num_epochs) {
-    int num_samples = dataset.size();
-    int blockSize = 256;
-    int numBlocks = (num_samples + blockSize - 1) / blockSize;
-
-    for (int epoch = 0; epoch < num_epochs; ++epoch) {
-        std::cout << "Epoch " << epoch + 1 << "/" << num_epochs << std::endl;
-
-        // Launch the training kernel
-        trainKernel<<<numBlocks, blockSize>>>(transformer, dataset, optimizer, lossFunction, num_epochs);
-        cudaDeviceSynchronize();
-
-        // Check for errors
-        cudaError_t err = cudaGetLastError();
-        if (err != cudaSuccess) {
-            std::cerr << "CUDA error: " << cudaGetErrorString(err) << std::endl;
-            break;
+void Trainer::train(const std::vector<std::vector<int>>& source_batches, const std::vector<std::vector<int>>& target_batches) {
+    for (int epoch = 0; epoch < epochs; ++epoch) {
+        std::cout << "Epoch " << (epoch + 1) << "/" << epochs << std::endl;
+        for (size_t i = 0; i < source_batches.size(); ++i) {
+            // 1. Forward
+            Matrix output = model.forward(source_batches[i], target_batches[i]);
+            // 2. Compute loss
+            double loss = loss_fn.forward(output, /*targets as Matrix*/); // Debes convertir target_batches[i] a Matrix
+            // 3. Backward y optimizer
+            Matrix grad = loss_fn.backward(output, /*targets as Matrix*/);
+            // optimizer.step(...); // Debes pasar los parámetros y gradientes correctos
         }
     }
 }
