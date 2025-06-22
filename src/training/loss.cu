@@ -1,6 +1,6 @@
 // filepath: cuda-transformer/cuda-transformer/src/training/loss.cu
 #include "loss.cuh"
-#include "cuda_utils.cuh"
+#include "utils/cuda_utils.cuh"
 
 __device__ float crossEntropyLoss(const float* predictions, const int* targets, int num_classes, int batch_size) {
     float loss = 0.0f;

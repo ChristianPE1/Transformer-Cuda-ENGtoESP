@@ -1,6 +1,6 @@
 // filepath: cuda-transformer/cuda-transformer/src/layers/linear.cu
 #include "linear.cuh"
-#include "cuda_utils.cuh"
+#include "utils/cuda_utils.cuh"
 
 __global__ void linear_forward_kernel(const float *input, const float *weights, const float *bias, float *output, int input_dim, int output_dim, int batch_size) {
     int batch_index = blockIdx.x;

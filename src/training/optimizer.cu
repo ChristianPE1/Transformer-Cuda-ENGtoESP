@@ -1,6 +1,6 @@
 // src/training/optimizer.cu
 #include "optimizer.cuh"
-#include "cuda_utils.cuh"
+#include "utils/cuda_utils.cuh"
 
 __global__ void updateWeightsKernel(float *weights, float *gradients, float learning_rate, int size) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;

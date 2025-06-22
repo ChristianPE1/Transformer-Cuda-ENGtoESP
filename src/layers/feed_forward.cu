@@ -1,6 +1,6 @@
 // filepath: cuda-transformer/cuda-transformer/src/layers/feed_forward.cu
 #include "feed_forward.cuh"
-#include "cuda_utils.cuh"
+#include "utils/cuda_utils.cuh"
 
 __global__ void feedForwardKernel(const Matrix input, Matrix output, const Matrix W1, const std::vector<double> b1, const Matrix W2, const std::vector<double> b2, size_t d_ff) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;

@@ -1,5 +1,5 @@
 // cuda_utils.cu
-#include "cuda_utils.cuh"
+#include "utils/cuda_utils.cuh"
 #include <cuda_runtime.h>
 #include <iostream>
 

@@ -1,6 +1,6 @@
 // filepath: /cuda-transformer/cuda-transformer/src/transformer/attention.cu
 #include "attention.cuh"
-#include "cuda_utils.cuh"
+#include "utils/cuda_utils.cuh"
 #include <cmath>
 
 __device__ void softmax(float* data, int length) {
