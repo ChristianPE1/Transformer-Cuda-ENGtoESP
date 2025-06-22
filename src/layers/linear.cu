@@ -15,19 +15,20 @@ __global__ void linear_forward_kernel(const float *input, const float *weights, 
     }
 }
 
-void Linear::forward(const Matrix &input, const Matrix &weights, const Matrix &bias, Matrix &output) {
+Matrix Linear::forward(const Matrix &input) {
     int batch_size = input.getRows();
     int input_dim = input.getCols();
     int output_dim = weights.getCols();
 
-    // Usa directamente los datos en device
     const float *d_input = input.getData();
     const float *d_weights = weights.getData();
     const float *d_bias = bias.getData();
+
+    Matrix output(batch_size, output_dim);
     float *d_output = output.getData();
 
-    // Lanza el kernel
     linear_forward_kernel<<<batch_size, output_dim>>>(d_input, d_weights, d_bias, d_output, input_dim, output_dim, batch_size);
 
     cudaDeviceSynchronize();
+    return output;
 }
