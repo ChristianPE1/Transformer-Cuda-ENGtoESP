@@ -3,7 +3,7 @@
 #define FEED_FORWARD_H
 
 #include <cuda_runtime.h>
-#include "matrix.cuh"
+#include "utils/matrix.cuh"
 
 class FeedForward {
 private:

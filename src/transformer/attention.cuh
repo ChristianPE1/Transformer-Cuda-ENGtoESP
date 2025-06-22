@@ -3,7 +3,7 @@
 #define ATTENTION_CUH
 
 #include <cuda_runtime.h>
-#include "matrix.cuh"
+#include "utils/matrix.cuh"
 
 class MultiHeadAttention {
 public:

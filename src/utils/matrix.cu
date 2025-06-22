@@ -1,4 +1,4 @@
-#include "matrix.cuh"
+#include "utils/matrix.cuh"
 #include <cuda_runtime.h>
 #include <iostream>
 #include <cmath>
