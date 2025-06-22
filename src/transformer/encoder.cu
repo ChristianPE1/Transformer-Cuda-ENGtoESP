@@ -1,4 +1,3 @@
-// filepath: cuda-transformer/cuda-transformer/src/transformer/encoder.cu
 #include "encoder.cuh"
 #include "attention.cuh"
 #include "layers/feed_forward.cuh"

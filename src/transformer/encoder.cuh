@@ -1,11 +1,12 @@
-// filepath: cuda-transformer/cuda-transformer/src/transformer/encoder.cuh
-#ifndef ENCODER_H
-#define ENCODER_H
+#pragma once
+//#ifndef ENCODER_H
+//#define ENCODER_H
 
 #include "common.cuh"
 #include "attention.cuh"
 #include "layers/feed_forward.cuh"
 #include "layers/layer_norm.cuh"
+#include <vector>
 
 class EncoderLayer {
 private:
@@ -29,4 +30,15 @@ public:
     }
 };
 
-#endif // ENCODER_H
+// Agrega la clase Encoder
+class Encoder {
+private:
+    std::vector<EncoderLayer> layers;
+    size_t n_layers;
+
+public:
+    Encoder(size_t d_model, size_t n_heads, size_t n_layers, size_t d_ff = 2048);
+    void forward(const Matrix &input, const Matrix &src_mask, Matrix &output);
+};
+
+//#endif // ENCODER_H

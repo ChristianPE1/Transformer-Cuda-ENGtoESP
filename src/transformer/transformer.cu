@@ -4,8 +4,7 @@
 #include <iostream>
 #include <cmath>
 
-Transformer::Transformer(size_t input_vocab_size, size_t target_vocab_size,
-                         size_t d_model, size_t n_heads, size_t n_layers, size_t d_ff)
+Transformer::Transformer(size_t input_vocab_size, size_t target_vocab_size,size_t d_model, size_t n_heads, size_t n_layers, size_t d_ff)
     : input_vocab_size(input_vocab_size), target_vocab_size(target_vocab_size),
       d_model(d_model), n_layers(n_layers),
       input_embedding(input_vocab_size, d_model),
@@ -103,7 +102,7 @@ Matrix Transformer::forward(const std::vector<int> &source_tokens,
 }
 
 std::vector<int> Transformer::generate(const std::vector<int> &source_tokens,
-                                       int sos_token, int eos_token, size_t max_length)
+int sos_token, int eos_token, size_t max_length)
 {
     std::vector<int> generated = {sos_token};
 
