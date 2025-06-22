@@ -70,3 +70,32 @@ FeedForward::~FeedForward() {
     if (b1) cudaFree(b1);
     if (b2) cudaFree(b2);
 }
+
+__global__ void initializeWeightsKernel(float* weights, int size, unsigned long seed) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < size) {
+        curandState state;
+        curand_init(seed, idx, 0, &state);
+        weights[idx] = curand_normal(&state) * 0.1f; // Xavier-like initialization
+    }
+}
+
+void FeedForward::initializeWeights() {
+    // Initialize W1 weights
+    int W1_size = d_model * d_ff;
+    std::vector<float> W1_data(W1_size);
+    for (int i = 0; i < W1_size; ++i) {
+        W1_data[i] = ((float)rand() / RAND_MAX - 0.5f) * 0.2f; // Random initialization
+    }
+    W1.copyFromHost(W1_data);
+
+    // Initialize W2 weights
+    int W2_size = d_ff * d_model;
+    std::vector<float> W2_data(W2_size);
+    for (int i = 0; i < W2_size; ++i) {
+        W2_data[i] = ((float)rand() / RAND_MAX - 0.5f) * 0.2f; // Random initialization
+    }
+    W2.copyFromHost(W2_data);
+
+    // Initialize biases to zero (ya están inicializados con cudaMemset en el constructor)
+}
