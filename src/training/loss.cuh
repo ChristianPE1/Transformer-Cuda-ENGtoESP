@@ -10,6 +10,8 @@ class Loss {
 public:
     __device__ virtual double forward(const Matrix& predictions, const Matrix& targets) = 0;
     __device__ virtual Matrix backward(const Matrix& predictions, const Matrix& targets) = 0;
+
+    void calculateCrossEntropy(const float* predictions, const int* targets, float* loss, int num_classes, int batch_size);
 };
 
 class CrossEntropyLoss : public Loss {
@@ -48,6 +50,6 @@ public:
         }
         return grad;
     }
-};
+#endif // LOSS_H
 
 #endif // LOSS_H
