@@ -2,8 +2,11 @@
 #include "feed_forward.cuh"
 #include "utils/cuda_utils.cuh"
 #include <cuda_runtime.h>
+#include <curand.h>
+#include <curand_kernel.h>
 #include <algorithm>
 #include <cmath>
+#include <cstdlib> // Para rand()
 
 __global__ void feedForwardKernel(
     const float* input, float* output,
