@@ -5,9 +5,9 @@
 #include "layers/layer_norm.cuh"
 #include "utils/cuda_utils.cuh"
 
-__device__ Matrix EncoderLayer::forward(const Matrix &input, const Matrix &src_mask) {
+Matrix EncoderLayer::forward(const Matrix &input, const Matrix *src_mask) {
     // Self-attention
-    Matrix self_att_output = self_attention.forward(input, input, input, src_mask);
+    Matrix self_att_output = self_attention.forward(input, input, input, src_mask ? *src_mask : Matrix());
     Matrix norm1_output = norm1.forward(input.add(self_att_output));
 
     // Feed-forward
