@@ -20,27 +20,14 @@ void Linear::forward(const Matrix &input, const Matrix &weights, const Matrix &b
     int input_dim = input.getCols();
     int output_dim = weights.getCols();
 
-    // Allocate device memory
-    float *d_input, *d_weights, *d_bias, *d_output;
-    cudaMalloc(&d_input, batch_size * input_dim * sizeof(float));
-    cudaMalloc(&d_weights, input_dim * output_dim * sizeof(float));
-    cudaMalloc(&d_bias, output_dim * sizeof(float));
-    cudaMalloc(&d_output, batch_size * output_dim * sizeof(float));
+    // Usa directamente los datos en device
+    const float *d_input = input.getData();
+    const float *d_weights = weights.getData();
+    const float *d_bias = bias.getData();
+    float *d_output = output.getData();
 
-    // Copy data to device
-    cudaMemcpy(d_input, input.getData(), batch_size * input_dim * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_weights, weights.getData(), input_dim * output_dim * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_bias, bias.getData(), output_dim * sizeof(float), cudaMemcpyHostToDevice);
-
-    // Launch kernel
+    // Lanza el kernel
     linear_forward_kernel<<<batch_size, output_dim>>>(d_input, d_weights, d_bias, d_output, input_dim, output_dim, batch_size);
 
-    // Copy output back to host
-    cudaMemcpy(output.getData(), d_output, batch_size * output_dim * sizeof(float), cudaMemcpyDeviceToHost);
-
-    // Free device memory
-    cudaFree(d_input);
-    cudaFree(d_weights);
-    cudaFree(d_bias);
-    cudaFree(d_output);
+    cudaDeviceSynchronize();
 }
