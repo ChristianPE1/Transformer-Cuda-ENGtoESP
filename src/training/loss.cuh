@@ -51,5 +51,3 @@ public:
         return grad;
     }
 #endif // LOSS_H
-
-#endif // LOSS_H
