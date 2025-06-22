@@ -4,8 +4,8 @@
 
 #include <vector>
 #include "transformer/transformer.cuh"
-#include "loss/loss.cuh"
-#include "optimizer/optimizer.cuh"
+#include "training/loss.cuh"
+#include "training/optimizer.cuh"
 
 class Trainer {
 public:
