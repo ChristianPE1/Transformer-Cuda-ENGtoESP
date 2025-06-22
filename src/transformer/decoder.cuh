@@ -4,8 +4,8 @@
 
 #include "common.cuh"
 #include "attention.cuh"
-#include "feed_forward.cuh"
-#include "layer_norm.cuh"
+#include "../layers/feed_forward.cuh"
+#include "../layers/layer_norm.cuh"
 #include <vector>
 
 class DecoderLayer {
