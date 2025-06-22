@@ -31,31 +31,21 @@ __global__ void layer_norm_kernel(float *input, float *output, float *gamma, flo
     }
 }
 
-void LayerNorm::forward(float *input, float *output, float *gamma, float *beta, 
-                        int N, int D, float epsilon) {
-    float *d_input, *d_output, *d_gamma, *d_beta;
-    size_t input_size = N * D * sizeof(float);
-    size_t output_size = N * D * sizeof(float);
-    size_t gamma_size = D * sizeof(float);
-    size_t beta_size = D * sizeof(float);
+Matrix LayerNorm::forward(const Matrix &input) {
+    int N = input.getRows();
+    int D = input.getCols();
+    Matrix output(N, D);
 
-    cudaMalloc(&d_input, input_size);
-    cudaMalloc(&d_output, output_size);
-    cudaMalloc(&d_gamma, gamma_size);
-    cudaMalloc(&d_beta, beta_size);
-
-    cudaMemcpy(d_input, input, input_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_gamma, gamma, gamma_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_beta, beta, beta_size, cudaMemcpyHostToDevice);
+    float *d_input = input.getData();
+    float *d_output = output.getData();
+    float *d_gamma = gamma.getData();
+    float *d_beta = beta.getData();
 
     int blockSize = 256;
     int numBlocks = (N + blockSize - 1) / blockSize;
     layer_norm_kernel<<<numBlocks, blockSize>>>(d_input, d_output, d_gamma, d_beta, N, D, epsilon);
 
-    cudaMemcpy(output, d_output, output_size, cudaMemcpyDeviceToHost);
+    cudaDeviceSynchronize();
 
-    cudaFree(d_input);
-    cudaFree(d_output);
-    cudaFree(d_gamma);
-    cudaFree(d_beta);
+    return output;
 }
