@@ -5,24 +5,20 @@
 #include "layers/layer_norm.cuh"
 #include "utils/cuda_utils.cuh"
 
-Matrix EncoderLayer::forward(const Matrix &input, const Matrix *src_mask) {
-    // Self-attention
-    Matrix self_att_output = self_attention.forward(input, input, input, src_mask ? *src_mask : Matrix());
-    Matrix norm1_output = norm1.forward(input.add(self_att_output));
-
-    // Feed-forward
-    Matrix ff_output = feed_forward.forward(norm1_output);
-    Matrix norm2_output = norm2.forward(norm1_output.add(ff_output));
-
-    return norm2_output;
-}
-
-
 // Kernel function to launch multiple encoder layers
 __global__ void encodeKernel(Matrix *input, Matrix *output, Matrix *src_mask, EncoderLayer *layers, size_t n_layers) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < n_layers) {
         output[idx] = layers[idx].forward(input[idx], &src_mask[idx]);
+    }
+}
+
+// Constructor de Encoder
+Encoder::Encoder(size_t d_model, size_t n_heads, size_t n_layers, size_t d_ff)
+    : n_layers(n_layers) {
+    layers.reserve(n_layers);
+    for (size_t i = 0; i < n_layers; ++i) {
+        layers.emplace_back(d_model, n_heads, d_ff);
     }
 }
 
