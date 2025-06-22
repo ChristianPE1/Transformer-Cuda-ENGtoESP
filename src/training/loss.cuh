@@ -50,4 +50,5 @@ public:
         }
         return grad;
     }
+};
 #endif // LOSS_H
