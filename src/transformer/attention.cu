@@ -48,7 +48,7 @@ __global__ void multiHeadAttentionKernel(float* queries, float* keys, float* val
     }
 }
 
-void MultiHeadAttention::forward(float* queries, float* keys, float* values, 
+Matrix MultiHeadAttention::forward(float* queries, float* keys, float* values, 
                                   float* output, int seq_length) {
     int blockSize = 256;
     int numBlocks = (seq_length + blockSize - 1) / blockSize;

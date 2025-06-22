@@ -12,6 +12,7 @@ private:
     bool on_device;
 
 public:
+    __host__ Matrix() : data(nullptr), rows(0), cols(0), on_device(false) {} // Default constructor
     __host__ Matrix(int rows, int cols);
     __host__ Matrix(int rows, int cols, float init_val);
     __host__ ~Matrix();
