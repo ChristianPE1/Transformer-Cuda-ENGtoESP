@@ -1,8 +1,8 @@
 // File: /cuda-transformer/cuda-transformer/src/transformer/decoder.cu
 #include "decoder.cuh"
 #include "attention.cuh"
-#include "feed_forward.cuh"
-#include "layer_norm.cuh"
+#include "../layers/feed_forward.cuh"
+#include "../layers/layer_norm.cuh"
 #include "utils/cuda_utils.cuh"
 
 __device__ Matrix DecoderLayer::forward(const Matrix &input, const Matrix &encoder_output,
