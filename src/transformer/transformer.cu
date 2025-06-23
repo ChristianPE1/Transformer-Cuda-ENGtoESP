@@ -5,7 +5,8 @@
 #include <iomanip>
 #include <cmath>
 
-Transformer::Transformer(size_t input_vocab_size, size_t target_vocab_size,size_t d_model, size_t n_heads, size_t n_layers, size_t d_ff)
+Transformer::Transformer(size_t input_vocab_size, size_t target_vocab_size,
+    size_t d_model, size_t n_heads, size_t n_layers, size_t d_ff)
     : input_vocab_size(input_vocab_size), target_vocab_size(target_vocab_size),
       d_model(d_model), n_layers(n_layers),
       input_embedding(input_vocab_size, d_model),
@@ -70,46 +71,51 @@ Matrix Transformer::decode(const std::vector<int> &target_tokens,
 Matrix Transformer::forward(const std::vector<int> &source_tokens,
                             const std::vector<int> &target_tokens)
 {
-    std::cout << "[DEBUG] Forward - source: " << source_tokens.size() 
-              << " tokens, target: " << target_tokens.size() << " tokens" << std::endl;
+    //std::cout << "[DEBUG] Forward - source: " << source_tokens.size() << " tokens, target: " << target_tokens.size() << " tokens" << std::endl;
     
     // Store target tokens for later gradient updates
     last_target_tokens = target_tokens;
     
     // Encode
     Matrix encoder_output = encode(source_tokens);
-    std::cout << "[DEBUG] Encode OK - shape: " << encoder_output.getRows() << "x" << encoder_output.getCols() << std::endl;
+    //std::cout << "[DEBUG] Encode OK - shape: " << encoder_output.getRows() << "x" << encoder_output.getCols() << std::endl;
 
     // Decode
     Matrix decoder_output = decode(target_tokens, encoder_output);
-    std::cout << "[DEBUG] Decode OK - shape: " << decoder_output.getRows() << "x" << decoder_output.getCols() << std::endl;
+    //std::cout << "[DEBUG] Decode OK - shape: " << decoder_output.getRows() << "x" << decoder_output.getCols() << std::endl;
 
     // Project to vocabulary (simplified linear projection)
     Matrix output(target_tokens.size(), target_vocab_size, 0.0f);
-    std::cout << "[DEBUG] Created output matrix: " << output.getRows() << "x" << output.getCols() << std::endl;
-
-    // PROYECCIÓN MÁS ROBUSTA - Valores más grandes y variados
+    
     for (int i = 0; i < target_tokens.size(); ++i) {
-        for (int v = 0; v < target_vocab_size; ++v) { 
-            // Proyección que garantiza valores no-cero
-            float projection = 0.0f;
+        std::vector<float> logits(target_vocab_size, 0.0f);
+        
+        // Calcular logits basados en el decoder output
+        for (int v = 0; v < target_vocab_size; ++v) {
+            float logit = 0.0f;
             
-            // Base: valor aleatorio basado en posición
-            projection += (float)((i + v) % 10) * 0.1f;
-            
-            // Contribución del decoder (amplificada)
-            for (int d = 0; d < std::min(5, (int)d_model); ++d) {
+            // Usar decoder output para calcular logits
+            for (int d = 0; d < d_model; ++d) {
                 float decoder_val = decoder_output.getElement(i, d);
-                projection += decoder_val * (v % 20 + 1) * 0.5f; // Amplifica la contribución
+                logit += decoder_val * sin((v + d) * 0.1f); // Proyección simple pero real
             }
             
-            // Asegurar diversidad en scores
-            projection += (float)(v % 100) * 0.01f; // Bias por vocabulario
-            
-            output.setElement(i, v, projection);
+            // Agregar bias por vocabulario
+            logit += (float)(v % 100) * 0.01f;
+            logits[v] = logit;
         }
-        if (i % 2 == 0) {
-            std::cout << "[DEBUG] Processed row " << i << std::endl;
+        
+        // APLICAR SOFTMAX
+        float max_logit = *std::max_element(logits.begin(), logits.end());
+        float sum_exp = 0.0f;
+        
+        for (int v = 0; v < target_vocab_size; ++v) {
+            logits[v] = exp(logits[v] - max_logit);
+            sum_exp += logits[v];
+        }
+        
+        for (int v = 0; v < target_vocab_size; ++v) {
+            output.setElement(i, v, logits[v] / sum_exp);
         }
     }
     
@@ -171,17 +177,17 @@ int sos_token, int eos_token, size_t max_length)
 }
 
 void Transformer::updateWeights(const Matrix& gradients, float learning_rate) {
-    std::cout << "[UPDATE] Aplicando gradientes con lr=" << learning_rate << std::endl;
+    //std::cout << "[UPDATE] Aplicando gradientes con lr=" << learning_rate << std::endl;
     
     // Usar los tokens del último forward pass
     if (!last_target_tokens.empty()) {
         try {
             target_embedding.updateWeights(gradients, learning_rate, last_target_tokens);
-            std::cout << "[UPDATE] Target embeddings actualizados para " << last_target_tokens.size() << " tokens" << std::endl;
+            //std::cout << "[UPDATE] Target embeddings actualizados para " << last_target_tokens.size() << " tokens" << std::endl;
         } catch (const std::exception& e) {
-            std::cout << "[UPDATE] Error actualizando embeddings: " << e.what() << std::endl;
+            //std::cout << "[UPDATE] Error actualizando embeddings: " << e.what() << std::endl;
         }
     } else {
-        std::cout << "[UPDATE] No hay tokens para actualizar" << std::endl;
+        //std::cout << "[UPDATE] No hay tokens para actualizar" << std::endl;
     }
 }

@@ -32,9 +32,7 @@ public:
     Matrix encode(const std::vector<int> &input_tokens);
     Matrix decode(const std::vector<int> &target_tokens, const Matrix &encoder_output);
     Matrix forward(const std::vector<int> &source_tokens, const std::vector<int> &target_tokens);
-    std::vector<int> generate(const std::vector<int> &source_tokens,
-                              int sos_token = 2, int eos_token = 3,
-                              size_t max_length = 50);
+    std::vector<int> generate(const std::vector<int> &source_tokens,int sos_token = 2, int eos_token = 3,size_t max_length = 50);
     
     // Training methods
     void updateWeights(const Matrix& gradients, float learning_rate);
