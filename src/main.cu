@@ -160,6 +160,26 @@ int main()
             
             std::cout << "\n¡Entrenamiento completado!" << std::endl;
         }
+
+        // PRUEBAS DE TRADUCCIÓN
+        std::cout << "\n=== Pruebas de Traducción ===" << std::endl;
+
+        std::vector<std::string> test_sentences = {
+            "<sos> hello <eos>",
+            "<sos> how are you <eos>",
+            "<sos> good morning <eos>",
+            "<sos> thank you <eos>",
+            "<sos> i love you <eos>"
+        };
+
+        for (const auto& sentence : test_sentences) {
+            auto test_ids = eng_vocab.sentenceToIds(sentence);
+            auto generated = transformer.generate(test_ids, 2, 3, 10);
+            
+            std::cout << "ENG: " << sentence << std::endl;
+            std::cout << "ESP: " << spa_vocab.idsToSentence(generated) << std::endl;
+            std::cout << "---" << std::endl;
+        }
     }
     catch (const std::exception &e)
     {

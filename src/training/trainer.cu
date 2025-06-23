@@ -36,8 +36,14 @@ void Trainer::train(const std::vector<std::vector<int>>& source_batches, const s
             std::cout << " Target OK..." << std::flush;
             
             // 2. Loss simplificado
-            double loss = 1.0; // Por ahora, loss fijo para probar
+            double loss = loss_fn.forward(output, target);
             std::cout << " Loss: " << loss << std::endl;
+            
+            // 3. Backward y optimizer 
+            Matrix grad = loss_fn.backward(output, target);
+
+            // Actualizar pesos (simplificado)
+            // optimizer.step(model_params, gradients, param_size);
             
         } catch (const std::exception& e) {
             std::cout << " ERROR: " << e.what() << std::endl;

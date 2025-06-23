@@ -112,7 +112,10 @@ int sos_token, int eos_token, size_t max_length)
         int best_token = 0;
         float best_score = output.getElement(last_pos, 0);
 
-        for (int v = 1; v < target_vocab_size; ++v)
+        // BUSCA EN MÁS PALABRAS DEL VOCABULARIO
+        int search_limit = std::min(1000, (int)target_vocab_size); // Busca en 1000 palabras
+        
+        for (int v = 1; v < search_limit; ++v)
         {
             float score = output.getElement(last_pos, v);
             if (score > best_score)
@@ -120,6 +123,12 @@ int sos_token, int eos_token, size_t max_length)
                 best_score = score;
                 best_token = v;
             }
+        }
+
+        // DEBUG: Muestra los top 3 tokens
+        if (step < 3) {
+            std::cout << "[GEN] Step " << step << " - Best token: " << best_token 
+                      << " (score: " << best_score << ")" << std::endl;
         }
 
         generated.push_back(best_token);
