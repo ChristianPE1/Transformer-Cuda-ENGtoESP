@@ -1,25 +1,25 @@
 #!/bin/bash
+# filepath: scripts/train.sh
 
-# Script to train the CUDA Transformer model
+echo "=== Entrenando Transformer CUDA ==="
 
-# Set the number of epochs and batch size
-EPOCHS=10
-BATCH_SIZE=32
+# Cambiar al directorio del proyecto
+cd "$(dirname "$0")/.."
 
-# Set the paths for training and validation data
-TRAIN_DATA="../data/train.txt"
-VALID_DATA="../data/test.txt"
+# Verificar que el executable existe
+if [ ! -f "bin/cuda_transformer" ]; then
+    echo "Error: No se encontró bin/cuda_transformer"
+    echo "Ejecuta 'make' para compilar el proyecto primero"
+    exit 1
+fi
 
-# Set the output directory for model checkpoints
-OUTPUT_DIR="../output"
+# Verificar que el archivo TSV existe
+if [ ! -f "db_translate.tsv" ]; then
+    echo "Error: No se encontró db_translate.tsv"
+    exit 1
+fi
 
-# Create output directory if it doesn't exist
-mkdir -p $OUTPUT_DIR
+echo "Ejecutando entrenamiento..."
+./bin/cuda_transformer
 
-# Compile the CUDA code
-nvcc -o transformer_train ../src/main.cu -I../include -L/usr/local/cuda/lib64 -lcudart
-
-# Run the training
-./transformer_train --train_data $TRAIN_DATA --valid_data $VALID_DATA --epochs $EPOCHS --batch_size $BATCH_SIZE --output_dir $OUTPUT_DIR
-
-echo "Training completed!"
+echo "¡Entrenamiento completado!"

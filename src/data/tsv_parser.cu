@@ -5,6 +5,8 @@
 #include <string>
 #include <algorithm>
 #include <cctype>
+#include <locale>
+#include <codecvt>
 
 void TSVParser::parseFile(const std::string &filename,
                           std::vector<std::pair<std::string, std::string>> &pairs)
@@ -17,6 +19,8 @@ void TSVParser::parseFile(const std::string &filename,
       std::cerr << "Error: Could not open file " << filename << std::endl;
       return;
    }
+   // para resolver codificaion utf-8
+   file.imbue(std::locale(std::locale(), new std::codecvt_utf8<wchar_t>));
 
    while (std::getline(file, line))
    {

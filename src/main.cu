@@ -110,6 +110,52 @@ int main()
             std::cout << "\nTesting generation..." << std::endl;
             auto generated = transformer.generate(source_ids, 2, 3, 10); // sos=2, eos=3
             std::cout << "Generated: " << spa_vocab.idsToSentence(generated) << std::endl;
+            
+            // AGREGAR ENTRENAMIENTO AQUÍ:
+            std::cout << "\n=== Iniciando Entrenamiento ===" << std::endl;
+            
+            // Configuración de entrenamiento
+            int epochs = 5;  // Empezar con pocas épocas para probar
+            int batch_size = 32;
+            float learning_rate = 0.001f;
+            
+            std::cout << "Configuración:" << std::endl;
+            std::cout << "  Épocas: " << epochs << std::endl;
+            std::cout << "  Batch size: " << batch_size << std::endl;
+            std::cout << "  Learning rate: " << learning_rate << std::endl;
+            
+            // Crear componentes de entrenamiento
+            CrossEntropyLoss loss_fn;
+            SGD optimizer(learning_rate);
+            Trainer trainer(transformer, optimizer, loss_fn, batch_size, epochs);
+            
+            // Bucle de entrenamiento
+            for (int epoch = 0; epoch < epochs; epoch++) {
+                std::cout << "\nÉpoca " << (epoch + 1) << "/" << epochs << std::endl;
+                
+                // Obtener batch de entrenamiento
+                auto train_batch = dataset.getBatch(batch_size, true);
+                
+                std::vector<std::vector<int>> source_batches;
+                std::vector<std::vector<int>> target_batches;
+                
+                for (const auto& sample : train_batch) {
+                    source_batches.push_back(sample.first);
+                    target_batches.push_back(sample.second);
+                }
+                
+                // Entrenar
+                trainer.train(source_batches, target_batches);
+                
+                // Probar generación cada época
+                if ((epoch + 1) % 1 == 0) {
+                    std::cout << "  Probando generación..." << std::endl;
+                    auto gen = transformer.generate(source_ids, 2, 3, 10);
+                    std::cout << "  Generated: " << spa_vocab.idsToSentence(gen) << std::endl;
+                }
+            }
+            
+            std::cout << "\n¡Entrenamiento completado!" << std::endl;
         }
     }
     catch (const std::exception &e)

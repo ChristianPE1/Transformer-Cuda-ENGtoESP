@@ -1,22 +1,19 @@
 #!/bin/bash
+# filepath: scripts/evaluate.sh
 
-# Script to evaluate the Transformer model on the test dataset
+echo "=== Evaluando Transformer CUDA ==="
 
-# Set the CUDA device (optional)
-export CUDA_VISIBLE_DEVICES=0
+# Cambiar al directorio del proyecto
+cd "$(dirname "$0")/.."
 
-# Define paths
-DATA_DIR="../data"
-MODEL_DIR="../models"
-OUTPUT_DIR="../output"
-TEST_FILE="$DATA_DIR/test.txt"
-OUTPUT_FILE="$OUTPUT_DIR/evaluation_results.txt"
+# Verificar que el executable existe
+if [ ! -f "bin/cuda_transformer" ]; then
+    echo "Error: No se encontró bin/cuda_transformer"
+    echo "Ejecuta 'make' para compilar el proyecto primero"
+    exit 1
+fi
 
-# Create output directory if it doesn't exist
-mkdir -p $OUTPUT_DIR
+echo "Ejecutando evaluación..."
+./bin/cuda_transformer
 
-# Run the evaluation
-nvcc ../src/main.cu -o evaluate_transformer -I../include -L../lib -lcudart
-./evaluate_transformer --test_file $TEST_FILE --model_dir $MODEL_DIR --output_file $OUTPUT_FILE
-
-echo "Evaluation completed. Results saved to $OUTPUT_FILE."
+echo "¡Evaluación completada!"
