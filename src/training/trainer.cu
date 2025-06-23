@@ -17,20 +17,38 @@ void Trainer::train(const std::vector<std::vector<int>>& source_batches, const s
     int num_classes = model.getTargetVocabSize(); 
     
     std::cout << "  Procesando " << source_batches.size() << " muestras..." << std::endl;
+    std::cout << "  Vocabulario objetivo: " << num_classes << " clases" << std::endl;
     
     for (size_t i = 0; i < source_batches.size(); ++i) {
-        // 1. Forward
-        Matrix output = model.forward(source_batches[i], target_batches[i]);
-        Matrix target = vectorToOneHotMatrix(target_batches[i], num_classes);
+        std::cout << "    Procesando muestra " << (i+1) << "/" << source_batches.size() << "..." << std::flush;
         
-        // 2. Compute loss
-        double loss = loss_fn.forward(output, target);
-        if (i % 5 == 0) {  // Solo imprime cada 5 batches
-            std::cout << "    Batch " << (i+1) << " - Loss: " << loss << std::endl;
+        // 1. Forward pass
+        try {
+            Matrix output = model.forward(source_batches[i], target_batches[i]);
+            std::cout << " Forward OK..." << std::flush;
+            
+            // SIMPLIFICA EL TARGET - No uses one-hot para todas las clases
+            int target_length = target_batches[i].size();
+            Matrix target(target_length, 1);  // Solo una columna con los índices
+            for (int j = 0; j < target_length; ++j) {
+                target.setElement(j, 0, target_batches[i][j]);
+            }
+            std::cout << " Target OK..." << std::flush;
+            
+            // 2. Loss simplificado
+            double loss = 1.0; // Por ahora, loss fijo para probar
+            std::cout << " Loss: " << loss << std::endl;
+            
+        } catch (const std::exception& e) {
+            std::cout << " ERROR: " << e.what() << std::endl;
+            return;
         }
         
-        // 3. Backward (simplificado por ahora)
-        Matrix grad = loss_fn.backward(output, target);
+        // Solo procesa 3 muestras para probar
+        if (i >= 2) {
+            std::cout << "    Probando solo 3 muestras por ahora..." << std::endl;
+            break;
+        }
     }
 }
 

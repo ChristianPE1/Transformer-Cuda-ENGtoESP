@@ -119,7 +119,7 @@ int main()
             
             // Configuración de entrenamiento
             int epochs = 5;  // Empezar con pocas épocas para probar
-            int batch_size = 32;
+            int batch_size = 4;
             float learning_rate = 0.001f;
             
             std::cout << "Configuración:" << std::endl;

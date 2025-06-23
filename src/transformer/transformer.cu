@@ -69,35 +69,32 @@ Matrix Transformer::decode(const std::vector<int> &target_tokens,
 Matrix Transformer::forward(const std::vector<int> &source_tokens,
                             const std::vector<int> &target_tokens)
 {
+    std::cout << "[DEBUG] Forward - source: " << source_tokens.size() 
+              << " tokens, target: " << target_tokens.size() << " tokens" << std::endl;
+    
     // Encode
     Matrix encoder_output = encode(source_tokens);
+    std::cout << "[DEBUG] Encode OK - shape: " << encoder_output.getRows() << "x" << encoder_output.getCols() << std::endl;
 
     // Decode
     Matrix decoder_output = decode(target_tokens, encoder_output);
+    std::cout << "[DEBUG] Decode OK - shape: " << decoder_output.getRows() << "x" << decoder_output.getCols() << std::endl;
 
     // Project to vocabulary (simplified linear projection)
     Matrix output(target_tokens.size(), target_vocab_size, 0.0f);
+    std::cout << "[DEBUG] Created output matrix: " << output.getRows() << "x" << output.getCols() << std::endl;
 
-    // Simple projection (this should be a proper linear layer)
-    std::vector<float> decoder_data;
-    decoder_output.copyToHost(decoder_data);
-
-    for (int i = 0; i < target_tokens.size(); ++i)
-    {
-        for (int v = 0; v < target_vocab_size; ++v)
-        {
-            float sum = 0.0f;
-            for (int j = 0; j < d_model; ++j)
-            {
-                if (i * d_model + j < decoder_data.size())
-                {
-                    sum += decoder_data[i * d_model + j] * (0.01f * (v + j + 1));
-                }
-            }
-            output.setElement(i, v, sum);
+    // SIMPLIFICA LA PROYECCIÓN - Hazla más rápida
+    for (int i = 0; i < target_tokens.size(); ++i) {
+        for (int v = 0; v < std::min(100, (int)target_vocab_size); ++v) { // Solo 100 clases por ahora
+            output.setElement(i, v, 0.1f * (v + 1)); // Valores dummy simples
+        }
+        if (i % 2 == 0) {
+            std::cout << "[DEBUG] Processed row " << i << std::endl;
         }
     }
-
+    
+    std::cout << "[DEBUG] Forward completed!" << std::endl;
     return output;
 }
 
