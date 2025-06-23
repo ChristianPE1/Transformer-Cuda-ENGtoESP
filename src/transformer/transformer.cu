@@ -4,6 +4,10 @@
 #include <iostream>
 #include <iomanip>
 #include <cmath>
+#include <algorithm>    // Para std::max_element, std::min_element
+#include <vector>       // Para std::vector
+#include <numeric>      // Para std::accumulate
+#include <functional>   // Para std::function
 
 Transformer::Transformer(size_t input_vocab_size, size_t target_vocab_size,
     size_t d_model, size_t n_heads, size_t n_layers, size_t d_ff)
