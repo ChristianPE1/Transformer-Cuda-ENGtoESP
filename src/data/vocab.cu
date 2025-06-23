@@ -44,7 +44,7 @@ void Vocab::buildFromSentences(const std::vector<std::string> &sentences)
     int next_id = 4; // Start after special tokens
     for (const auto &[word, count] : sorted_words)
     {
-        if (count >= 2 && next_id < 5000) { // Aumenta a 5000 palabras
+        if (count >= 2 && next_id < 2000) { // Reduce a 2000 palabras por ahora
             word_to_id[word] = next_id;
             id_to_word[next_id] = word;
             next_id++;

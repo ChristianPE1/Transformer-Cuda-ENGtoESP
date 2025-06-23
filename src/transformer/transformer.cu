@@ -123,7 +123,7 @@ Matrix Transformer::forward(const std::vector<int> &source_tokens,
         }
     }
     
-    std::cout << "[DEBUG] Forward completed!" << std::endl;
+    //std::cout << "[DEBUG] Forward completed!" << std::endl;
     return output;
 }
 
@@ -142,7 +142,7 @@ int sos_token, int eos_token, size_t max_length)
         float best_score = output.getElement(last_pos, 0);
 
         // BUSCA EN MÁS PALABRAS DEL VOCABULARIO
-        int search_limit = std::min(1000, (int)target_vocab_size); // Busca en 1000 palabras
+        int search_limit = std::min(100, (int)target_vocab_size); // Busca en 1000 palabras
         
         for (int v = 1; v < search_limit; ++v)
         {
@@ -153,21 +153,6 @@ int sos_token, int eos_token, size_t max_length)
                 best_token = v;
             }
         }
-
-        // DEBUG: Muestra los top 3 tokens y algunos scores
-        if (step < 3) {
-            std::cout << "[GEN] Step " << step << " - Best token: " << best_token 
-                      << " (score: " << best_score << ")";
-            
-            // Mostrar algunos scores para debug
-            std::cout << " [Scores: ";
-            for (int i = 0; i < 5; ++i) {
-                float score = output.getElement(last_pos, i);
-                std::cout << i << ":" << std::fixed << std::setprecision(1) << score << " ";
-            }
-            std::cout << "]" << std::endl;
-        }
-
         generated.push_back(best_token);
 
         // Continuar hasta max_length o hasta encontrar EOS

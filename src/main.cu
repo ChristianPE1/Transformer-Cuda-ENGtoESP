@@ -118,7 +118,7 @@ int main()
             
             // Configuración de entrenamiento
             int epochs = 10;  // Menos épocas pero más efectivas
-            int batch_size = 16;  // Batch más pequeño para mejor aprendizaje
+            int batch_size = 8;  // En lugar de 16
             float learning_rate = 0.1f;  // Learning rate MÁS ALTO
             
             std::cout << "Configuración:" << std::endl;
@@ -150,9 +150,9 @@ int main()
                 trainer.train(source_batches, target_batches);
                 
                 // Probar generación cada época
-                if ((epoch + 1) % 1 == 0) {
+                if ((epoch + 1) % 2 == 0) {  // Solo cada 2 épocas en lugar de cada una
                     std::cout << "  Probando generación..." << std::endl;
-                    auto gen = transformer.generate(source_ids, 2, 3, 10);
+                    auto gen = transformer.generate(source_ids, 2, 3, 5);  // Solo 5 tokens en lugar de 10
                     std::cout << "  Generated: " << spa_vocab.idsToSentence(gen) << std::endl;
                 }
             }
