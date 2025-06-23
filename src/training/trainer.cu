@@ -15,18 +15,22 @@ Matrix vectorToOneHotMatrix(const std::vector<int>& indices, int num_classes) {
 
 void Trainer::train(const std::vector<std::vector<int>>& source_batches, const std::vector<std::vector<int>>& target_batches) {
     int num_classes = model.getTargetVocabSize(); 
-    for (int epoch = 0; epoch < epochs; ++epoch) {
-        std::cout << "Epoch " << (epoch + 1) << "/" << epochs << std::endl;
-        for (size_t i = 0; i < source_batches.size(); ++i) {
-            // 1. Forward
-            Matrix output = model.forward(source_batches[i], target_batches[i]);
-            Matrix target = vectorToOneHotMatrix(target_batches[i], num_classes);
-            // 2. Compute loss
-            double loss = loss_fn.forward(output, target);
-            // 3. Backward y optimizer
-            Matrix grad = loss_fn.backward(output, target);
-            // optimizer.step(...); // Debes pasar los parámetros y gradientes correctos
+    
+    std::cout << "  Procesando " << source_batches.size() << " muestras..." << std::endl;
+    
+    for (size_t i = 0; i < source_batches.size(); ++i) {
+        // 1. Forward
+        Matrix output = model.forward(source_batches[i], target_batches[i]);
+        Matrix target = vectorToOneHotMatrix(target_batches[i], num_classes);
+        
+        // 2. Compute loss
+        double loss = loss_fn.forward(output, target);
+        if (i % 5 == 0) {  // Solo imprime cada 5 batches
+            std::cout << "    Batch " << (i+1) << " - Loss: " << loss << std::endl;
         }
+        
+        // 3. Backward (simplificado por ahora)
+        Matrix grad = loss_fn.backward(output, target);
     }
 }
 
