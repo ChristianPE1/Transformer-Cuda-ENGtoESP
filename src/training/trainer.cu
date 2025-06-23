@@ -1,6 +1,7 @@
 // filepath: cuda-transformer/cuda-transformer/src/training/trainer.cu
 #include "trainer.cuh"
 #include <iostream>
+#include <iomanip>
 
 // Convierte un vector de índices a una matriz one-hot (batch_size x num_classes)
 Matrix vectorToOneHotMatrix(const std::vector<int>& indices, int num_classes) {
@@ -37,13 +38,15 @@ void Trainer::train(const std::vector<std::vector<int>>& source_batches, const s
             
             // 2. Loss simplificado
             double loss = loss_fn.forward(output, target);
-            std::cout << " Loss: " << loss << std::endl;
+            std::cout << " [FAST-LOSS] batch:" << target_length << " classes:" << num_classes << " loss:" << std::fixed << std::setprecision(1) << loss;
             
-            // 3. Backward y optimizer 
+            // 3. Backward pass - AHORA SÍ ACTUALIZA LOS PESOS
             Matrix grad = loss_fn.backward(output, target);
-
-            // Actualizar pesos (simplificado)
-            // optimizer.step(model_params, gradients, param_size);
+            
+            // SIMPLE WEIGHT UPDATE - Actualiza directamente los embeddings
+            model.updateWeights(grad, 0.01f); // learning rate más alto
+            
+            std::cout << " Loss: " << std::fixed << std::setprecision(1) << loss << std::endl;
             
         } catch (const std::exception& e) {
             std::cout << " ERROR: " << e.what() << std::endl;
