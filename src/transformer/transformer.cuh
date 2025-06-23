@@ -20,6 +20,9 @@ private:
     size_t n_layers;
     size_t input_vocab_size;
     size_t target_vocab_size;
+    
+    // Store tokens from last forward pass for gradient updates
+    std::vector<int> last_target_tokens;
 
 public:
     Transformer(size_t input_vocab_size, size_t target_vocab_size,
@@ -32,6 +35,10 @@ public:
     std::vector<int> generate(const std::vector<int> &source_tokens,
                               int sos_token = 2, int eos_token = 3,
                               size_t max_length = 50);
+    
+    // Training methods
+    void updateWeights(const Matrix& gradients, float learning_rate);
+    
     size_t getTargetVocabSize() const { return target_vocab_size; }
 };
 

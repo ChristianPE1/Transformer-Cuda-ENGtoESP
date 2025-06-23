@@ -72,6 +72,9 @@ Matrix Transformer::forward(const std::vector<int> &source_tokens,
     std::cout << "[DEBUG] Forward - source: " << source_tokens.size() 
               << " tokens, target: " << target_tokens.size() << " tokens" << std::endl;
     
+    // Store target tokens for later gradient updates
+    last_target_tokens = target_tokens;
+    
     // Encode
     Matrix encoder_output = encode(source_tokens);
     std::cout << "[DEBUG] Encode OK - shape: " << encoder_output.getRows() << "x" << encoder_output.getCols() << std::endl;
@@ -84,10 +87,15 @@ Matrix Transformer::forward(const std::vector<int> &source_tokens,
     Matrix output(target_tokens.size(), target_vocab_size, 0.0f);
     std::cout << "[DEBUG] Created output matrix: " << output.getRows() << "x" << output.getCols() << std::endl;
 
-    // SIMPLIFICA LA PROYECCIÓN - Hazla más rápida
+    // MEJOR PROYECCIÓN - Usa los valores del decoder
     for (int i = 0; i < target_tokens.size(); ++i) {
-        for (int v = 0; v < std::min(100, (int)target_vocab_size); ++v) { // Solo 100 clases por ahora
-            output.setElement(i, v, 0.1f * (v + 1)); // Valores dummy simples
+        for (int v = 0; v < target_vocab_size; ++v) { 
+            // Proyección simple: suma ponderada de las características del decoder
+            float projection = 0.0f;
+            for (int d = 0; d < std::min(10, (int)d_model); ++d) { // Solo 10 dimensiones por velocidad
+                projection += decoder_output.getElement(i, d) * (0.01f * (v % 100 + 1));
+            }
+            output.setElement(i, v, projection);
         }
         if (i % 2 == 0) {
             std::cout << "[DEBUG] Processed row " << i << std::endl;
@@ -140,4 +148,20 @@ int sos_token, int eos_token, size_t max_length)
     }
 
     return generated;
+}
+
+void Transformer::updateWeights(const Matrix& gradients, float learning_rate) {
+    std::cout << "[UPDATE] Aplicando gradientes con lr=" << learning_rate << std::endl;
+    
+    // Usar los tokens del último forward pass
+    if (!last_target_tokens.empty()) {
+        try {
+            target_embedding.updateWeights(gradients, learning_rate, last_target_tokens);
+            std::cout << "[UPDATE] Target embeddings actualizados para " << last_target_tokens.size() << " tokens" << std::endl;
+        } catch (const std::exception& e) {
+            std::cout << "[UPDATE] Error actualizando embeddings: " << e.what() << std::endl;
+        }
+    } else {
+        std::cout << "[UPDATE] No hay tokens para actualizar" << std::endl;
+    }
 }
