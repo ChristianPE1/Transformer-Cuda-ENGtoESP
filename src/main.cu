@@ -86,8 +86,7 @@ int main()
 
         // Test Transformer
         std::cout << "\n=== Testing Transformer ===" << std::endl;
-        Transformer transformer(dataset.getEngVocab().size(),
-                                dataset.getSpaVocab().size(),
+        Transformer transformer(dataset.getEngVocab().size(),dataset.getSpaVocab().size(),
                                 128,  // d_model
                                 4,    // n_heads
                                 2,    // n_layers
@@ -118,8 +117,8 @@ int main()
             std::cout << "\n=== Iniciando Entrenamiento ===" << std::endl;
             
             // Configuración de entrenamiento
-            int epochs = 5;  // Empezar con pocas épocas para probar
-            int batch_size = 4;
+            int epochs = 10;  // Empezar con pocas épocas para probar
+            int batch_size = 8;
             float learning_rate = 0.001f;
             
             std::cout << "Configuración:" << std::endl;
