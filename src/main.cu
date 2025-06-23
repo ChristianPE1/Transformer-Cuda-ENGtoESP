@@ -4,6 +4,9 @@
 #include "data/vocab.cuh"
 #include "transformer/transformer.cuh"
 #include "utils/matrix.cuh"
+#include "training/loss.cuh"
+#include "training/optimizer.cuh"
+#include "training/trainer.cuh"
 
 int main()
 {

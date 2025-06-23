@@ -29,3 +29,8 @@ void Trainer::train(const std::vector<std::vector<int>>& source_batches, const s
         }
     }
 }
+
+Trainer::Trainer(Transformer& model, Optimizer& optimizer, Loss& loss_fn, int batch_size, int epochs)
+    : model(model), optimizer(optimizer), loss_fn(loss_fn), batch_size(batch_size), epochs(epochs) {
+    // Constructor implementation
+}
