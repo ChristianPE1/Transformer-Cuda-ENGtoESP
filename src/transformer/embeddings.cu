@@ -139,3 +139,39 @@ Matrix PositionalEncoding::getEncoding(int seq_len)
 
     return result;
 }
+
+__global__ void updateEmbeddingWeightsKernel(float* weights, float* gradients, 
+                                            int* tokens, float learning_rate,
+                                            int seq_len, int d_model, int vocab_size) {
+    int token_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int dim_idx = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    if (token_idx < seq_len && dim_idx < d_model) {
+        int token_id = tokens[token_idx];
+        if (token_id >= 0 && token_id < vocab_size) {
+            int weight_idx = token_id * d_model + dim_idx;
+            int grad_idx = token_idx * d_model + dim_idx;
+            weights[weight_idx] -= learning_rate * gradients[grad_idx];
+        }
+    }
+}
+
+void Embedding::updateWeights(const Matrix& gradients, float learning_rate, const std::vector<int>& tokens) {
+    int seq_len = tokens.size();
+    
+    // Copy tokens to device
+    int *d_tokens;
+    cudaMalloc(&d_tokens, seq_len * sizeof(int));
+    cudaMemcpy(d_tokens, tokens.data(), seq_len * sizeof(int), cudaMemcpyHostToDevice);
+    
+    // Update weights
+    dim3 blockSize(16, 16);
+    dim3 gridSize((seq_len + blockSize.x - 1) / blockSize.x,
+                  (d_model + blockSize.y - 1) / blockSize.y);
+    
+    updateEmbeddingWeightsKernel<<<gridSize, blockSize>>>(
+        weights, gradients.getData(), d_tokens, learning_rate, seq_len, d_model, vocab_size);
+    
+    cudaDeviceSynchronize();
+    cudaFree(d_tokens);
+}

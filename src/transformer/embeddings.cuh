@@ -18,6 +18,7 @@ public:
 
     void initializeWeights();
     Matrix forward(const std::vector<int> &input_tokens);
+    void updateWeights(const Matrix& gradients, float learning_rate, const std::vector<int>& tokens);
 };
 
 class PositionalEncoding
