@@ -176,6 +176,19 @@ int main()
             auto generated = transformer.generate(test_ids, 2, 3, 10);
             
             std::cout << "ENG: " << sentence << std::endl;
+            
+            // DEBUG: Mostrar IDs generados
+            std::cout << "Generated IDs: ";
+            for (int id : generated) std::cout << id << " ";
+            std::cout << std::endl;
+            
+            // DEBUG: Mostrar cada token individualmente
+            std::cout << "Generated tokens: ";
+            for (int id : generated) {
+                std::cout << spa_vocab.getWord(id) << " ";
+            }
+            std::cout << std::endl;
+            
             std::cout << "ESP: " << spa_vocab.idsToSentence(generated) << std::endl;
             std::cout << "---" << std::endl;
         }

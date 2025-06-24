@@ -65,6 +65,13 @@ Matrix Transformer::decode(const std::vector<int> &target_tokens,
 {
     // Get target embeddings
     Matrix embeddings = target_embedding.forward(target_tokens);
+    
+    // DEBUG: Verificar embeddings iniciales
+    std::cout << "[DEBUG] Raw embeddings (fila 0, primeros 5): ";
+    for (int d = 0; d < std::min(5, (int)d_model); ++d) {
+        std::cout << std::fixed << std::setprecision(3) << embeddings.getElement(0, d) << " ";
+    }
+    std::cout << std::endl;
 
     // Scale embeddings
     std::vector<float> embed_data;
@@ -75,9 +82,24 @@ Matrix Transformer::decode(const std::vector<int> &target_tokens,
         val *= scale;
     }
     embeddings.copyFromHost(embed_data);
+    
+    // DEBUG: Verificar embeddings después del escalado
+    std::cout << "[DEBUG] Scaled embeddings (fila 0, primeros 5): ";
+    for (int d = 0; d < std::min(5, (int)d_model); ++d) {
+        std::cout << std::fixed << std::setprecision(3) << embeddings.getElement(0, d) << " ";
+    }
+    std::cout << std::endl;
 
     // Add positional encoding
     Matrix pos_enc = pos_encoding.getEncoding(target_tokens.size());
+    
+    // DEBUG: Verificar positional encoding
+    std::cout << "[DEBUG] Pos encoding (fila 0, primeros 5): ";
+    for (int d = 0; d < std::min(5, (int)d_model); ++d) {
+        std::cout << std::fixed << std::setprecision(3) << pos_enc.getElement(0, d) << " ";
+    }
+    std::cout << std::endl;
+    
     Matrix decoder_input = embeddings.add(pos_enc);
 
     // For now, return decoder_input (no actual decoder layers yet)
@@ -94,8 +116,41 @@ Matrix Transformer::forward(const std::vector<int> &source_tokens,
     Matrix encoder_output = encode(source_tokens);
     Matrix decoder_output = decode(target_tokens, encoder_output);
 
+    // DEBUG: Verificar decoder_output
+    std::cout << "[DEBUG] Decoder output (fila 0, primeros 10): ";
+    for (int d = 0; d < std::min(10, (int)d_model); ++d) {
+        std::cout << std::fixed << std::setprecision(3) << decoder_output.getElement(0, d) << " ";
+    }
+    std::cout << std::endl;
+
     // USAR PESOS REALES DE PROYECCIÓN
+    std::cout << "[DEBUG] Matrix shapes - decoder: " << decoder_output.getRows() << "x" << decoder_output.getCols() 
+              << ", projection: " << projection_weights.getRows() << "x" << projection_weights.getCols() << std::endl;
+              
     Matrix logits = decoder_output.matrixMultiply(projection_weights);
+    
+    // TEMPORAL: Si todos los logits son cero, forzar algunos valores
+    bool all_zero = true;
+    for (int i = 0; i < std::min(10, logits.getRows()); ++i) {
+        for (int j = 0; j < std::min(10, logits.getCols()); ++j) {
+            if (logits.getElement(i, j) != 0.0f) {
+                all_zero = false;
+                break;
+            }
+        }
+        if (!all_zero) break;
+    }
+    
+    if (all_zero) {
+        std::cout << "[WARNING] All logits are zero! Forcing values..." << std::endl;
+        for (int i = 0; i < logits.getRows(); ++i) {
+            for (int j = 0; j < std::min(100, logits.getCols()); ++j) {
+                // Crear un patrón simple basado en posición
+                float value = 0.1f * ((i + j) % 10 - 5); // Valores entre -0.5 y 0.4
+                logits.setElement(i, j, value);
+            }
+        }
+    }
 
     // Añadir bias más variado y basado en posición
     for (int i = 0; i < logits.getRows(); i++) {
