@@ -33,10 +33,18 @@ public:
     // Matrix operations
     __host__ Matrix add(const Matrix &other) const;
     __host__ Matrix multiply(const Matrix &other) const;
+    __host__ Matrix matrixMultiply(const Matrix &other) const;  // Multiplicación real en GPU
+    __host__ Matrix softmax() const;  // Softmax en GPU
+    __host__ double sum() const;  // Suma en GPU
+    __host__ Matrix crossEntropyGrad(const Matrix &targets) const;  // Gradientes en GPU
 
     // Element access
     __host__ float getElement(int row, int col) const;
     __host__ void setElement(int row, int col, float value);
+
+    // Nuevos métodos optimizados
+    __host__ void copyToHostBatch(std::vector<float> &host_data) const;
+    __host__ void copyFromHostBatch(const std::vector<float> &host_data);
 };
 
 #endif // MATRIX_CUH
