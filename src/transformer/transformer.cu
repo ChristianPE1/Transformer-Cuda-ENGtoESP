@@ -28,12 +28,11 @@ Matrix Transformer::encode(const std::vector<int> &input_tokens)
     // Get embeddings
     Matrix embeddings = input_embedding.forward(input_tokens);
 
-    // Scale embeddings
+    // Scale embeddings properly (this is important for training stability)
     std::vector<float> embed_data;
     embeddings.copyToHost(embed_data);
-    float scale = sqrt(d_model);
-    for (auto &val : embed_data)
-    {
+    float scale = sqrt((float)d_model);
+    for (auto &val : embed_data) {
         val *= scale;
     }
     embeddings.copyFromHost(embed_data);
@@ -42,7 +41,9 @@ Matrix Transformer::encode(const std::vector<int> &input_tokens)
     Matrix pos_enc = pos_encoding.getEncoding(input_tokens.size());
     Matrix encoder_input = embeddings.add(pos_enc);
 
-    // For now, return encoder_input (no actual encoder layers yet)
+    // Apply simple layer normalization
+    encoder_input = applyLayerNorm(encoder_input);
+
     return encoder_input;
 }
 
@@ -55,9 +56,8 @@ Matrix Transformer::decode(const std::vector<int> &target_tokens,
     // Scale embeddings
     std::vector<float> embed_data;
     embeddings.copyToHost(embed_data);
-    float scale = sqrt(d_model);
-    for (auto &val : embed_data)
-    {
+    float scale = sqrt((float)d_model);
+    for (auto &val : embed_data) {
         val *= scale;
     }
     embeddings.copyFromHost(embed_data);
@@ -66,10 +66,50 @@ Matrix Transformer::decode(const std::vector<int> &target_tokens,
     Matrix pos_enc = pos_encoding.getEncoding(target_tokens.size());
     Matrix decoder_input = embeddings.add(pos_enc);
 
-    // ATENCIÓN CRUZADA SIMPLE - Mezclar decoder input con encoder output
-    Matrix decoder_output = applyCrossAttention(decoder_input, encoder_output);
+    // Apply layer normalization
+    decoder_input = applyLayerNorm(decoder_input);
+
+    // Enhanced cross-attention with residual connections
+    Matrix attended_output = applyCrossAttention(decoder_input, encoder_output);
+    
+    // Residual connection + layer norm
+    Matrix decoder_output = decoder_input.add(attended_output);
+    decoder_output = applyLayerNorm(decoder_output);
 
     return decoder_output;
+}
+
+// Simple layer normalization implementation
+Matrix Transformer::applyLayerNorm(const Matrix& input) {
+    int rows = input.getRows();
+    int cols = input.getCols();
+    Matrix output(rows, cols);
+    
+    for (int i = 0; i < rows; ++i) {
+        // Calculate mean
+        float mean = 0.0f;
+        for (int j = 0; j < cols; ++j) {
+            mean += input.getElement(i, j);
+        }
+        mean /= cols;
+        
+        // Calculate variance
+        float variance = 0.0f;
+        for (int j = 0; j < cols; ++j) {
+            float diff = input.getElement(i, j) - mean;
+            variance += diff * diff;
+        }
+        variance /= cols;
+        
+        // Normalize
+        float std_dev = sqrtf(variance + 1e-6f);
+        for (int j = 0; j < cols; ++j) {
+            float normalized = (input.getElement(i, j) - mean) / std_dev;
+            output.setElement(i, j, normalized);
+        }
+    }
+    
+    return output;
 }
 
 // Nueva función de atención cruzada simple
@@ -126,83 +166,99 @@ Matrix Transformer::forward(const std::vector<int> &source_tokens,
     // Store target tokens for later gradient updates
     last_target_tokens = target_tokens;
     
-    // Encode
+    // Encode with improved processing
     Matrix encoder_output = encode(source_tokens);
     std::cout << "[DEBUG] Encode OK - shape: " << encoder_output.getRows() << "x" << encoder_output.getCols() << std::endl;
 
-    // Decode
+    // Decode with improved cross-attention
     Matrix decoder_output = decode(target_tokens, encoder_output);
-    std::cout << "[DEBUG] Decode OK - shape: " << decoder_output.getRows() << "x" << decoder_output.getCols() << std::endl;    // Project to vocabulary - MEJORADO CON ATENCIÓN A FUENTE
+    std::cout << "[DEBUG] Decode OK - shape: " << decoder_output.getRows() << "x" << decoder_output.getCols() << std::endl;
+
+    // Project to vocabulary with improved attention mechanism
     Matrix output(target_tokens.size(), target_vocab_size, 0.0f);
     std::cout << "[DEBUG] Created output matrix: " << output.getRows() << "x" << output.getCols() << std::endl;
 
-    // Inicializar semilla una vez
-    static bool seed_initialized = false;
-    if (!seed_initialized) {
-        srand(time(nullptr));
-        seed_initialized = true;
-    }
-
+    // Improved cross-attention with proper normalization
     for (int i = 0; i < target_tokens.size(); ++i) {
         
-        // ATENCIÓN CRUZADA: Cada posición target atiende a todas las posiciones source
+        // Calculate cross-attention weights with proper softmax
         std::vector<float> cross_attention(source_tokens.size(), 0.0f);
-        float attention_sum = 0.0f;
+        float max_score = -1e9f;
         
+        // First pass: calculate raw attention scores
         for (int j = 0; j < source_tokens.size(); ++j) {
             float attention_score = 0.0f;
-            // Calcular atención basada en similitud decoder-encoder
-            for (int d = 0; d < std::min(16, (int)d_model); ++d) {
+            int context_size = std::min(32, (int)d_model);
+            
+            for (int d = 0; d < context_size; ++d) {
                 float decoder_val = decoder_output.getElement(i, d);
                 float encoder_val = encoder_output.getElement(j, d);
                 attention_score += decoder_val * encoder_val;
             }
-            cross_attention[j] = exp(attention_score * 0.1f);
-            attention_sum += cross_attention[j];
+            attention_score /= sqrtf(context_size); // Scale by sqrt(d_k)
+            cross_attention[j] = attention_score;
+            max_score = std::max(max_score, attention_score);
         }
         
-        // Normalizar atención
+        // Second pass: apply softmax
+        float attention_sum = 0.0f;
+        for (int j = 0; j < source_tokens.size(); ++j) {
+            cross_attention[j] = expf(cross_attention[j] - max_score);
+            attention_sum += cross_attention[j];
+        }
         for (int j = 0; j < source_tokens.size(); ++j) {
             cross_attention[j] /= (attention_sum + 1e-8f);
         }
         
+        // Generate vocabulary scores with better context integration
         for (int v = 0; v < target_vocab_size; ++v) { 
-            float similarity = 0.0f;
+            float score = 0.0f;
             
-            // 1. Similitud con embedding del token candidato
+            // 1. Direct similarity with target embedding
             std::vector<int> temp_token = {v};
             Matrix vocab_embedding = target_embedding.forward(temp_token);
             
-            for (int d = 0; d < std::min(32, (int)d_model); ++d) {
+            float direct_similarity = 0.0f;
+            for (int d = 0; d < std::min(64, (int)d_model); ++d) {
                 float decoder_val = decoder_output.getElement(i, d);
                 float vocab_val = vocab_embedding.getElement(0, d);
-                similarity += decoder_val * vocab_val;
+                direct_similarity += decoder_val * vocab_val;
             }
-            similarity /= std::min(32, (int)d_model);
+            direct_similarity /= std::min(64, (int)d_model);
+            score += direct_similarity * 2.0f; // Weight this heavily
             
-            // 2. Contribución del contexto fuente usando atención cruzada
+            // 2. Source context contribution via cross-attention
             float source_context = 0.0f;
             for (int j = 0; j < source_tokens.size(); ++j) {
-                for (int d = 0; d < std::min(8, (int)d_model); ++d) {
-                    float encoder_val = encoder_output.getElement(j, d);
-                    source_context += encoder_val * cross_attention[j] * ((v + d) % 20 + 1) * 0.01f;
+                // Get source token embedding for context
+                std::vector<int> src_token = {source_tokens[j]};
+                Matrix src_embedding = input_embedding.forward(src_token);
+                
+                float context_similarity = 0.0f;
+                for (int d = 0; d < std::min(32, (int)d_model); ++d) {
+                    float vocab_val = vocab_embedding.getElement(0, d);
+                    float src_val = src_embedding.getElement(0, d);
+                    context_similarity += vocab_val * src_val;
                 }
+                source_context += cross_attention[j] * context_similarity;
             }
-            similarity += source_context;
+            score += source_context * 0.5f;
             
-            // 3. Bias de frecuencia ajustado
-            if (v < 50) similarity += 0.15f;       // Tokens muy comunes
-            else if (v < 200) similarity += 0.1f;  // Tokens comunes  
-            else if (v < 500) similarity += 0.05f; // Tokens moderados
+            // 3. Position-aware bias (favor shorter, common words early)
+            if (i == 0 && v < 100) score += 0.2f; // Boost common words at start
+            if (i > 0 && v < 50) score += 0.1f;   // Moderate boost for common words
             
-            // 4. Pequeña exploración aleatoria
-            similarity += ((float)rand() / RAND_MAX - 0.5f) * 0.05f;
+            // 4. Length preference (discourage very short/long sequences)
+            int current_len = i + 1;
+            int target_len = std::max(2, (int)(source_tokens.size() * 0.8));
+            if (current_len < target_len && v != 3) score += 0.05f; // Continue generating
+            if (current_len >= target_len && v == 3) score += 1.0f; // Favor EOS at right time
             
-            output.setElement(i, v, similarity);
+            output.setElement(i, v, score);
         }
         
+        // Debug attention every few positions
         if (i % 2 == 0) {
-            // Encontrar posición source con mayor atención
             int max_attention_pos = 0;
             for (int j = 1; j < source_tokens.size(); ++j) {
                 if (cross_attention[j] > cross_attention[max_attention_pos]) {
@@ -210,7 +266,8 @@ Matrix Transformer::forward(const std::vector<int> &source_tokens,
                 }
             }
             std::cout << "[DEBUG] Processed row " << i 
-                      << " (attending to source pos " << max_attention_pos << ")" << std::endl;
+                      << " (attending to source pos " << max_attention_pos 
+                      << " with weight " << std::fixed << std::setprecision(2) << cross_attention[max_attention_pos] << ")" << std::endl;
         }
     }
     
@@ -223,74 +280,94 @@ int sos_token, int eos_token, size_t max_length)
 {
     std::vector<int> generated = {sos_token};
     
-    // Estimar longitud objetivo basada en la longitud de entrada
-    size_t target_length = std::max(2, (int)(source_tokens.size() * 0.9)); // 90% de la entrada
-    size_t actual_max = std::min(max_length, target_length + 2); // +2 para flexibilidad
+    // Estimate target length more conservatively
+    size_t target_length = std::max(2, (int)(source_tokens.size() * 0.8));
+    size_t actual_max = std::min(max_length, target_length + 3);
 
     for (size_t step = 0; step < actual_max; ++step)
     {
         Matrix output = forward(source_tokens, generated);
 
-        // Get last token predictions
+        // Get predictions for the last position
         int last_pos = generated.size() - 1;
         
-        // Buscar el mejor token con filtros
+        // Collect candidates with better scoring
         std::vector<std::pair<float, int>> candidates;
-        int search_limit = std::min(1000, (int)target_vocab_size);
         
-        for (int v = 0; v < search_limit; ++v)
+        for (int v = 0; v < target_vocab_size; ++v)
         {
             float score = output.getElement(last_pos, v);
             
-            // FILTROS IMPORTANTES:
-            // 1. No repetir SOS después del primer token
+            // Enhanced filtering and scoring
+            
+            // 1. Strongly discourage SOS repetition
             if (v == sos_token && generated.size() > 1) {
-                score -= 10.0f; // Penaliza fuertemente
+                score -= 20.0f;
+                continue;
             }
             
-            // 2. Si ya llevamos suficientes tokens, priorizar EOS
-            if (generated.size() >= target_length && v == eos_token) {
-                score += 5.0f; // Boost fuerte para EOS cuando debería terminar
+            // 2. Context-aware EOS timing
+            if (v == eos_token) {
+                if (generated.size() >= target_length) {
+                    score += 8.0f; // Strong boost when we should end
+                } else if (generated.size() < 2) {
+                    score -= 15.0f; // Discourage very early ending
+                }
             }
             
-            // 3. Penalizar tokens muy recientes (evitar repeticiones)
-            for (int i = std::max(0, (int)generated.size() - 3); i < generated.size(); i++) {
+            // 3. Prevent immediate repetition of last 2 tokens
+            bool is_recent_repeat = false;
+            for (int i = std::max(1, (int)generated.size() - 2); i < generated.size(); i++) {
                 if (generated[i] == v) {
-                    score -= 2.0f; // Penaliza repeticiones
+                    score -= 5.0f;
+                    is_recent_repeat = true;
                     break;
                 }
+            }
+            
+            // 4. Boost common words early, rare words later
+            if (step < 2) {
+                if (v < 100) score += 0.3f; // Common words early
+            } else {
+                if (v >= 100 && v < 500) score += 0.1f; // Mid-frequency words later
+            }
+            
+            // 5. Length-based adjustments
+            if (generated.size() > target_length + 1 && v != eos_token) {
+                score -= 3.0f; // Discourage continuing too long
             }
             
             candidates.push_back({score, v});
         }
         
-        // Ordenar por score descendente
+        // Sort by score
         std::sort(candidates.begin(), candidates.end(), std::greater<std::pair<float, int>>());
         
-        // Selección inteligente del token
+        // Improved token selection
         int best_token = candidates[0].second;
         float best_score = candidates[0].first;
         
-        // Usar sampling solo en los primeros tokens para más variedad
-        if (step < 2 && candidates.size() > 5) {
-            float temperature = 1.2f;
-            std::vector<float> probs(5);
+        // Use temperature-based sampling for first few tokens for diversity
+        if (step < 2 && candidates.size() > 3) {
+            float temperature = 0.8f;
+            std::vector<float> probs;
+            float max_score = candidates[0].first;
             float sum = 0.0f;
             
-            for (int i = 0; i < 5; ++i) {
-                probs[i] = exp(candidates[i].first / temperature);
-                sum += probs[i];
+            // Calculate probabilities for top candidates
+            for (int i = 0; i < std::min(5, (int)candidates.size()); ++i) {
+                float prob = expf((candidates[i].first - max_score) / temperature);
+                probs.push_back(prob);
+                sum += prob;
             }
             
-            // Normalizar probabilidades
-            for (int i = 0; i < 5; ++i) {
-                probs[i] /= sum;
-            }
+            // Normalize
+            for (float& p : probs) p /= sum;
             
-            // Selección probabilística entre top 3
+            // Sample from top 3
             float rand_val = ((float)rand() / RAND_MAX);
             float cumsum = 0.0f;
-            for (int i = 0; i < 3; ++i) {
+            for (int i = 0; i < std::min(3, (int)probs.size()); ++i) {
                 cumsum += probs[i];
                 if (rand_val <= cumsum) {
                     best_token = candidates[i].second;
@@ -300,7 +377,7 @@ int sos_token, int eos_token, size_t max_length)
             }
         }
 
-        // DEBUG: Muestra información de generación
+        // Enhanced debug output
         if (step < 3) {
             std::cout << "[GEN] Step " << step << " - Best token: " << best_token 
                       << " (score: " << std::fixed << std::setprecision(1) << best_score 
@@ -315,19 +392,21 @@ int sos_token, int eos_token, size_t max_length)
 
         generated.push_back(best_token);
 
-        // Terminar si encontramos EOS
+        // Stop on EOS
         if (best_token == eos_token) {
             break;
         }
         
-        // Forzar terminación si se excede la longitud objetivo
-        if (generated.size() >= target_length + 1) {
-            generated.push_back(eos_token);
+        // Force termination if too long
+        if (generated.size() >= target_length + 2) {
+            if (generated.back() != eos_token) {
+                generated.push_back(eos_token);
+            }
             break;
         }
     }
     
-    // Asegurar que termine con EOS si no lo tiene
+    // Ensure EOS ending
     if (generated.back() != eos_token && generated.size() < max_length) {
         generated.push_back(eos_token);
     }

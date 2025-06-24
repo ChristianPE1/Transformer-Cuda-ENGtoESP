@@ -30,6 +30,7 @@ public:
                 size_t n_layers = 6, size_t d_ff = 2048);    Matrix encode(const std::vector<int> &input_tokens);
     Matrix decode(const std::vector<int> &target_tokens, const Matrix &encoder_output);
     Matrix applyCrossAttention(const Matrix& decoder_input, const Matrix& encoder_output);
+    Matrix applyLayerNorm(const Matrix& input);
     Matrix forward(const std::vector<int> &source_tokens, const std::vector<int> &target_tokens);
     std::vector<int> generate(const std::vector<int> &source_tokens,
                               int sos_token = 2, int eos_token = 3,

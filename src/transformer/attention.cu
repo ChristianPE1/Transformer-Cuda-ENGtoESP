@@ -22,54 +22,64 @@ __device__ void softmax(float* data, int length) {
 
 __global__ void multiHeadAttentionKernel(
     const float* queries, const float* keys, const float* values, 
-    float* output, int d_model, int n_heads, int seq_length) 
+    float* output, int d_model, int n_heads, int seq_length, int key_seq_length) 
 {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int token_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int head_idx = blockIdx.y * blockDim.y + threadIdx.y;
     int head_size = d_model / n_heads;
 
-    if (idx < seq_length && seq_length <= MAX_SEQ_LEN) {
+    if (token_idx < seq_length && head_idx < n_heads && key_seq_length <= MAX_SEQ_LEN) {
         float attention_scores[MAX_SEQ_LEN];
-
-        // Calcula los scores de atención
-        for (int i = 0; i < seq_length; ++i) {
+        
+        // Calculate attention scores for this token and head
+        for (int k = 0; k < key_seq_length; ++k) {
             float score = 0.0f;
-            for (int j = 0; j < head_size; ++j) {
-                score += queries[idx * d_model + j] * keys[i * d_model + j];
+            for (int d = 0; d < head_size; ++d) {
+                int q_idx = token_idx * d_model + head_idx * head_size + d;
+                int k_idx = k * d_model + head_idx * head_size + d;
+                score += queries[q_idx] * keys[k_idx];
             }
-            attention_scores[i] = score;
+            // Scale by sqrt(head_size) for better gradient flow
+            attention_scores[k] = score / sqrtf((float)head_size);
         }
 
-        // Softmax sobre los scores
-        softmax(attention_scores, seq_length);
+        // Apply softmax
+        softmax(attention_scores, key_seq_length);
 
-        // Calcula la salida ponderada
-        for (int i = 0; i < seq_length; ++i) {
+        // Compute weighted sum of values
+        for (int d = 0; d < head_size; ++d) {
             float weighted_sum = 0.0f;
-            for (int j = 0; j < head_size; ++j) {
-                weighted_sum += attention_scores[i] * values[i * d_model + j];
+            for (int k = 0; k < key_seq_length; ++k) {
+                int v_idx = k * d_model + head_idx * head_size + d;
+                weighted_sum += attention_scores[k] * values[v_idx];
             }
-            output[idx * d_model + i] = weighted_sum;
+            int out_idx = token_idx * d_model + head_idx * head_size + d;
+            output[out_idx] = weighted_sum;
         }
     }
 }
 
 Matrix MultiHeadAttention::forward(const Matrix &query, const Matrix &key, const Matrix &value, const Matrix &mask) {
     int seq_length = query.getRows();
+    int key_seq_length = key.getRows();
     int d_model = query.getCols();
 
     Matrix output(seq_length, d_model);
 
-    // Llama al kernel usando los datos de los Matrix
-    int blockSize = 256;
-    int numBlocks = (seq_length + blockSize - 1) / blockSize;
-    multiHeadAttentionKernel<<<numBlocks, blockSize>>>(
+    // Use 2D grid: one dimension for tokens, another for heads
+    dim3 blockSize(16, 8);  // 16 tokens, 8 heads per block
+    dim3 gridSize((seq_length + blockSize.x - 1) / blockSize.x,
+                  (n_heads + blockSize.y - 1) / blockSize.y);
+    
+    multiHeadAttentionKernel<<<gridSize, blockSize>>>(
         query.getData(),
         key.getData(),
         value.getData(),
         output.getData(),
         d_model,
         n_heads,
-        seq_length
+        seq_length,
+        key_seq_length
     );
     cudaDeviceSynchronize();
 
