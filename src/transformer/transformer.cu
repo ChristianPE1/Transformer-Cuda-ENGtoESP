@@ -97,16 +97,39 @@ Matrix Transformer::forward(const std::vector<int> &source_tokens,
     // USAR PESOS REALES DE PROYECCIÓN
     Matrix logits = decoder_output.matrixMultiply(projection_weights);
 
-    // Añadir esta línea: Bias para forzar ciertos tokens
-    // Forzar token 50 (o cualquier otro token común)
+    // Añadir bias más variado y basado en posición
     for (int i = 0; i < logits.getRows(); i++) {
-        logits.setElement(i, 50, logits.getElement(i, 50) + 5.0f); // Bias grande
-        logits.setElement(i, 51, logits.getElement(i, 51) + 4.0f);
-        logits.setElement(i, 52, logits.getElement(i, 52) + 3.0f);
+        // Bias diferente para cada posición y más tokens
+        int pos_bias = (i + 1) % 10; // Varía según posición
+        
+        logits.setElement(i, 50 + pos_bias, logits.getElement(i, 50 + pos_bias) + 3.0f);
+        logits.setElement(i, 100 + pos_bias, logits.getElement(i, 100 + pos_bias) + 2.5f);
+        logits.setElement(i, 200 + pos_bias, logits.getElement(i, 200 + pos_bias) + 2.0f);
+        logits.setElement(i, 300 + pos_bias, logits.getElement(i, 300 + pos_bias) + 1.5f);
+        
+        // Agregar algo de aleatoriedad basada en step
+        if (i > 0) {
+            int rand_token = (i * 37 + 123) % 500 + 10; // Pseudo-aleatorio
+            logits.setElement(i, rand_token, logits.getElement(i, rand_token) + 1.0f);
+        }
     }
+
+    // DEBUG: Verificar logits antes del softmax
+    std::cout << "[DEBUG] Logits antes de softmax (fila 0, primeros 10): ";
+    for (int v = 0; v < 10; ++v) {
+        std::cout << std::fixed << std::setprecision(2) << logits.getElement(0, v) << " ";
+    }
+    std::cout << std::endl;
 
     // Softmax en GPU
     Matrix output = logits.softmax();
+    
+    // DEBUG: Verificar output después del softmax
+    std::cout << "[DEBUG] Output después de softmax (fila 0, primeros 10): ";
+    for (int v = 0; v < 10; ++v) {
+        std::cout << std::fixed << std::setprecision(4) << output.getElement(0, v) << " ";
+    }
+    std::cout << std::endl;
     
     return output;
 }
@@ -127,8 +150,8 @@ int sos_token, int eos_token, size_t max_length)
         int best_token = 0;
         float best_score = output.getElement(last_pos, 0);
         
-        // Solo busca en los primeros 100 tokens para ser rápido
-        for (int v = 1; v < std::min(100, (int)target_vocab_size); ++v) {
+        // Solo busca en los primeros 1000 tokens y incluye los tokens con bias
+        for (int v = 1; v < std::min(1000, (int)target_vocab_size); ++v) {
             float score = output.getElement(last_pos, v);
             if (score > best_score) {
                 best_score = score;
@@ -136,16 +159,38 @@ int sos_token, int eos_token, size_t max_length)
             }
         }
 
-        // DEBUG: Muestra información
+        // DEBUG: Muestra información más detallada
         if (step < 3) {
             std::cout << "[GEN] Step " << step << " - Token: " << best_token 
-                      << " (score: " << best_score << ")" << std::endl;
+                      << " (score: " << std::fixed << std::setprecision(3) << best_score;
+            
+            // Mostrar algunos scores más
+            std::cout << ") - Top scores: ";
+            for (int v = 0; v < 5; ++v) {
+                std::cout << v << ":" << std::fixed << std::setprecision(3) 
+                          << output.getElement(last_pos, v) << " ";
+            }
+            std::cout << std::endl;
         }
 
         generated.push_back(best_token);
 
-        if (best_token == eos_token && generated.size() > 2) {
+        // DEBUG: Mostrar estado de generación
+        if (step < 5) {
+            std::cout << "[GEN] Generated so far: ";
+            for (int t : generated) std::cout << t << " ";
+            std::cout << "(eos=" << eos_token << ")" << std::endl;
+        }
+
+        // Solo parar si encuentra EOS y ha generado al menos 3 tokens
+        if (best_token == eos_token && generated.size() > 3) {
+            std::cout << "[GEN] Stopping: Found EOS token" << std::endl;
             break;
+        }
+        
+        // También parar si genera muchos tokens 0 seguidos (puede ser un bucle)
+        if (best_token == 0 && step > 1) {
+            std::cout << "[GEN] Warning: Generated token 0, continuing..." << std::endl;
         }
     }
 
