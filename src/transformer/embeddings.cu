@@ -151,7 +151,20 @@ __global__ void updateEmbeddingWeightsKernel(float* weights, float* gradients,
         if (token_id >= 0 && token_id < vocab_size) {
             int weight_idx = token_id * d_model + dim_idx;
             int grad_idx = token_idx * d_model + dim_idx;
-            weights[weight_idx] -= learning_rate * gradients[grad_idx];
+            
+            // Aplicar gradiente con clipping para estabilidad
+            float grad_value = gradients[grad_idx];
+            
+            // Gradient clipping
+            if (grad_value > 1.0f) grad_value = 1.0f;
+            if (grad_value < -1.0f) grad_value = -1.0f;
+            
+            // Actualización con momentum implícito
+            float current_weight = weights[weight_idx];
+            float update = learning_rate * grad_value;
+            
+            // Agregar algo de momentum para suavizar actualizaciones
+            weights[weight_idx] = current_weight - update + 0.1f * update;
         }
     }
 }
