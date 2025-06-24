@@ -46,15 +46,14 @@ void Trainer::train(const std::vector<std::vector<int>>& source_batches, const s
             model.updateWeights(grad, optimizer.getLearningRate());
             
             std::cout << " Loss: " << std::fixed << std::setprecision(1) << loss << std::endl;
-            
-        } catch (const std::exception& e) {
+              } catch (const std::exception& e) {
             std::cout << " ERROR: " << e.what() << std::endl;
             return;
         }
         
-        // Solo procesa 3 muestras para probar
-        if (i >= 2) {
-            std::cout << "    Probando solo 3 muestras por ahora..." << std::endl;
+        // Procesar más muestras para mejor aprendizaje
+        if (i >= 7) { // Aumentado de 2 a 7 para procesar 8 muestras
+            std::cout << "    Procesando 8 muestras por época..." << std::endl;
             break;
         }
     }

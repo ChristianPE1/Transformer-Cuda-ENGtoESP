@@ -132,44 +132,85 @@ Matrix Transformer::forward(const std::vector<int> &source_tokens,
 
     // Decode
     Matrix decoder_output = decode(target_tokens, encoder_output);
-    std::cout << "[DEBUG] Decode OK - shape: " << decoder_output.getRows() << "x" << decoder_output.getCols() << std::endl;    // Project to vocabulary usando similitud con embeddings objetivo
+    std::cout << "[DEBUG] Decode OK - shape: " << decoder_output.getRows() << "x" << decoder_output.getCols() << std::endl;    // Project to vocabulary - MEJORADO CON ATENCIÓN A FUENTE
     Matrix output(target_tokens.size(), target_vocab_size, 0.0f);
     std::cout << "[DEBUG] Created output matrix: " << output.getRows() << "x" << output.getCols() << std::endl;
 
-    // PROYECCIÓN BASADA EN SIMILITUD CON EMBEDDINGS
+    // Inicializar semilla una vez
+    static bool seed_initialized = false;
+    if (!seed_initialized) {
+        srand(time(nullptr));
+        seed_initialized = true;
+    }
+
     for (int i = 0; i < target_tokens.size(); ++i) {
+        
+        // ATENCIÓN CRUZADA: Cada posición target atiende a todas las posiciones source
+        std::vector<float> cross_attention(source_tokens.size(), 0.0f);
+        float attention_sum = 0.0f;
+        
+        for (int j = 0; j < source_tokens.size(); ++j) {
+            float attention_score = 0.0f;
+            // Calcular atención basada en similitud decoder-encoder
+            for (int d = 0; d < std::min(16, (int)d_model); ++d) {
+                float decoder_val = decoder_output.getElement(i, d);
+                float encoder_val = encoder_output.getElement(j, d);
+                attention_score += decoder_val * encoder_val;
+            }
+            cross_attention[j] = exp(attention_score * 0.1f);
+            attention_sum += cross_attention[j];
+        }
+        
+        // Normalizar atención
+        for (int j = 0; j < source_tokens.size(); ++j) {
+            cross_attention[j] /= (attention_sum + 1e-8f);
+        }
+        
         for (int v = 0; v < target_vocab_size; ++v) { 
             float similarity = 0.0f;
             
-            // Calcular similitud entre decoder output y embedding del token v
+            // 1. Similitud con embedding del token candidato
             std::vector<int> temp_token = {v};
             Matrix vocab_embedding = target_embedding.forward(temp_token);
             
-            // Producto punto normalizado (similitud coseno simplificada)
             for (int d = 0; d < std::min(32, (int)d_model); ++d) {
                 float decoder_val = decoder_output.getElement(i, d);
                 float vocab_val = vocab_embedding.getElement(0, d);
                 similarity += decoder_val * vocab_val;
             }
-            
-            // Normalizar por dimensión
             similarity /= std::min(32, (int)d_model);
             
-            // Agregar bias basado en frecuencia (tokens más comunes tienen mayor probabilidad)
-            float frequency_bias = 0.0f;
-            if (v < 100) frequency_bias = 0.1f;      // Tokens comunes
-            else if (v < 500) frequency_bias = 0.05f; // Tokens moderados
-            else frequency_bias = 0.01f;              // Tokens raros
+            // 2. Contribución del contexto fuente usando atención cruzada
+            float source_context = 0.0f;
+            for (int j = 0; j < source_tokens.size(); ++j) {
+                for (int d = 0; d < std::min(8, (int)d_model); ++d) {
+                    float encoder_val = encoder_output.getElement(j, d);
+                    source_context += encoder_val * cross_attention[j] * ((v + d) % 20 + 1) * 0.01f;
+                }
+            }
+            similarity += source_context;
             
-            similarity += frequency_bias;
+            // 3. Bias de frecuencia ajustado
+            if (v < 50) similarity += 0.15f;       // Tokens muy comunes
+            else if (v < 200) similarity += 0.1f;  // Tokens comunes  
+            else if (v < 500) similarity += 0.05f; // Tokens moderados
             
-            // Pequeña aleatoriedad para diversidad
-            similarity += ((float)rand() / RAND_MAX - 0.5f) * 0.1f;
+            // 4. Pequeña exploración aleatoria
+            similarity += ((float)rand() / RAND_MAX - 0.5f) * 0.05f;
             
             output.setElement(i, v, similarity);
         }
+        
         if (i % 2 == 0) {
-            std::cout << "[DEBUG] Processed row " << i << std::endl;
+            // Encontrar posición source con mayor atención
+            int max_attention_pos = 0;
+            for (int j = 1; j < source_tokens.size(); ++j) {
+                if (cross_attention[j] > cross_attention[max_attention_pos]) {
+                    max_attention_pos = j;
+                }
+            }
+            std::cout << "[DEBUG] Processed row " << i 
+                      << " (attending to source pos " << max_attention_pos << ")" << std::endl;
         }
     }
     
@@ -181,53 +222,75 @@ std::vector<int> Transformer::generate(const std::vector<int> &source_tokens,
 int sos_token, int eos_token, size_t max_length)
 {
     std::vector<int> generated = {sos_token};
+    
+    // Estimar longitud objetivo basada en la longitud de entrada
+    size_t target_length = std::max(2, (int)(source_tokens.size() * 0.9)); // 90% de la entrada
+    size_t actual_max = std::min(max_length, target_length + 2); // +2 para flexibilidad
 
-    for (size_t step = 0; step < max_length; ++step)
+    for (size_t step = 0; step < actual_max; ++step)
     {
         Matrix output = forward(source_tokens, generated);
 
         // Get last token predictions
         int last_pos = generated.size() - 1;
         
-        // Buscar el mejor token con algo de aleatoriedad
+        // Buscar el mejor token con filtros
         std::vector<std::pair<float, int>> candidates;
         int search_limit = std::min(1000, (int)target_vocab_size);
         
         for (int v = 0; v < search_limit; ++v)
         {
             float score = output.getElement(last_pos, v);
+            
+            // FILTROS IMPORTANTES:
+            // 1. No repetir SOS después del primer token
+            if (v == sos_token && generated.size() > 1) {
+                score -= 10.0f; // Penaliza fuertemente
+            }
+            
+            // 2. Si ya llevamos suficientes tokens, priorizar EOS
+            if (generated.size() >= target_length && v == eos_token) {
+                score += 5.0f; // Boost fuerte para EOS cuando debería terminar
+            }
+            
+            // 3. Penalizar tokens muy recientes (evitar repeticiones)
+            for (int i = std::max(0, (int)generated.size() - 3); i < generated.size(); i++) {
+                if (generated[i] == v) {
+                    score -= 2.0f; // Penaliza repeticiones
+                    break;
+                }
+            }
+            
             candidates.push_back({score, v});
         }
         
         // Ordenar por score descendente
         std::sort(candidates.begin(), candidates.end(), std::greater<std::pair<float, int>>());
-          // Seleccionar entre los top tokens con mejor estrategia
+        
+        // Selección inteligente del token
         int best_token = candidates[0].second;
         float best_score = candidates[0].first;
         
-        // MEJORA: Usar temperatura variable y beam search simple
-        if (step < 5 && candidates.size() > 10) {
-            // Temperatura más alta al principio para más exploración
-            float temperature = 1.5f - (step * 0.2f); // Decrece de 1.5 a 0.5
-            
-            // Aplicar softmax con temperatura
-            std::vector<float> probs(10);
+        // Usar sampling solo en los primeros tokens para más variedad
+        if (step < 2 && candidates.size() > 5) {
+            float temperature = 1.2f;
+            std::vector<float> probs(5);
             float sum = 0.0f;
             
-            for (int i = 0; i < 10; ++i) {
+            for (int i = 0; i < 5; ++i) {
                 probs[i] = exp(candidates[i].first / temperature);
                 sum += probs[i];
             }
             
-            // Normalizar
-            for (int i = 0; i < 10; ++i) {
+            // Normalizar probabilidades
+            for (int i = 0; i < 5; ++i) {
                 probs[i] /= sum;
             }
             
-            // Selección ponderada entre top 3 candidatos
+            // Selección probabilística entre top 3
             float rand_val = ((float)rand() / RAND_MAX);
             float cumsum = 0.0f;
-            for (int i = 0; i < 3; ++i) { // Solo top 3 para ser más conservador
+            for (int i = 0; i < 3; ++i) {
                 cumsum += probs[i];
                 if (rand_val <= cumsum) {
                     best_token = candidates[i].second;
@@ -235,22 +298,14 @@ int sos_token, int eos_token, size_t max_length)
                     break;
                 }
             }
-        } else {
-            // En pasos posteriores, ser más conservador
-            if (candidates.size() > 3) {
-                // Elegir aleatoriamente entre top 3
-                int choice = rand() % 3;
-                best_token = candidates[choice].second;
-                best_score = candidates[choice].first;
-            }
         }
 
         // DEBUG: Muestra información de generación
         if (step < 3) {
             std::cout << "[GEN] Step " << step << " - Best token: " << best_token 
-                      << " (score: " << std::fixed << std::setprecision(1) << best_score << ")";
+                      << " (score: " << std::fixed << std::setprecision(1) << best_score 
+                      << ", target_len: " << target_length << ")";
             
-            // Mostrar algunos scores para debug
             std::cout << " [Top scores: ";
             for (int i = 0; i < std::min(5, (int)candidates.size()); ++i) {
                 std::cout << candidates[i].second << ":" << std::fixed << std::setprecision(1) << candidates[i].first << " ";
@@ -260,11 +315,21 @@ int sos_token, int eos_token, size_t max_length)
 
         generated.push_back(best_token);
 
-        // Continuar hasta max_length o hasta encontrar EOS
-        if (best_token == eos_token && generated.size() > 2)
-        {
+        // Terminar si encontramos EOS
+        if (best_token == eos_token) {
             break;
         }
+        
+        // Forzar terminación si se excede la longitud objetivo
+        if (generated.size() >= target_length + 1) {
+            generated.push_back(eos_token);
+            break;
+        }
+    }
+    
+    // Asegurar que termine con EOS si no lo tiene
+    if (generated.back() != eos_token && generated.size() < max_length) {
+        generated.push_back(eos_token);
     }
 
     return generated;
