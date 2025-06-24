@@ -42,8 +42,54 @@ Matrix Transformer::encode(const std::vector<int> &input_tokens)
     Matrix pos_enc = pos_encoding.getEncoding(input_tokens.size());
     Matrix encoder_input = embeddings.add(pos_enc);
 
-    // For now, return encoder_input (no actual encoder layers yet)
-    return encoder_input;
+    // AUTOATENCIÓN SIMPLE PARA EL ENCODER
+    Matrix encoder_output = applySimpleSelfAttention(encoder_input);
+
+    return encoder_output;
+}
+
+// Nueva función de autoatención para el encoder
+Matrix Transformer::applySimpleSelfAttention(const Matrix& input) {
+    int seq_len = input.getRows();
+    int d_model = input.getCols();
+    
+    Matrix output(seq_len, d_model, 0.0f);
+    
+    for (int i = 0; i < seq_len; ++i) {
+        for (int d = 0; d < d_model; ++d) {
+            float attended_value = 0.0f;
+            float attention_sum = 0.0f;
+            
+            // Cada posición atiende a todas las demás (incluyéndose a sí misma)
+            for (int j = 0; j < seq_len; ++j) {
+                // Calcular score de atención
+                float attention_score = 0.0f;
+                for (int k = 0; k < std::min(32, d_model); ++k) {
+                    attention_score += input.getElement(i, k) * input.getElement(j, k);
+                }
+                
+                // Aplicar softmax simple
+                attention_score = exp(attention_score * 0.05f); // Temperatura más baja
+                attention_sum += attention_score;
+                
+                // Agregar contribución ponderada
+                attended_value += attention_score * input.getElement(j, d);
+            }
+            
+            // Normalizar
+            if (attention_sum > 0) {
+                attended_value /= attention_sum;
+            }
+            
+            // Conexión residual + normalización de capa simple
+            float original_value = input.getElement(i, d);
+            float final_value = 0.6f * original_value + 0.4f * attended_value;
+            
+            output.setElement(i, d, final_value);
+        }
+    }
+    
+    return output;
 }
 
 Matrix Transformer::decode(const std::vector<int> &target_tokens,
@@ -72,7 +118,7 @@ Matrix Transformer::decode(const std::vector<int> &target_tokens,
     return decoder_output;
 }
 
-// Nueva función de atención cruzada simple
+// Atención cruzada mejorada con mejor diversidad
 Matrix Transformer::applyCrossAttention(const Matrix& decoder_input, const Matrix& encoder_output) {
     int decoder_len = decoder_input.getRows();
     int encoder_len = encoder_output.getRows();
@@ -87,14 +133,33 @@ Matrix Transformer::applyCrossAttention(const Matrix& decoder_input, const Matri
             
             // Calcular atención entre posición i del decoder y todas las del encoder
             for (int j = 0; j < encoder_len; ++j) {
-                // Peso de atención simple basado en producto punto
+                // MEJORAR CÁLCULO DE ATENCIÓN - Más diversidad
                 float attention_score = 0.0f;
+                
+                // 1. Producto punto básico
                 for (int k = 0; k < std::min(16, d_model); ++k) {
                     attention_score += decoder_input.getElement(i, k) * encoder_output.getElement(j, k);
                 }
                 
-                // Normalizar y aplicar softmax simple
-                attention_score = exp(attention_score * 0.1f); // Temperature para suavizar
+                // 2. Bias posicional para evitar que siempre atienda a pos 0
+                float position_bias = 0.0f;
+                if (decoder_len > 1 && encoder_len > 1) {
+                    // Hacer que cada posición decoder prefiera ciertas posiciones encoder
+                    float relative_pos = (float)j / (encoder_len - 1); // 0 a 1
+                    float decoder_relative = (float)i / (decoder_len - 1); // 0 a 1
+                    
+                    // Bias que favorece correspondencia posicional aproximada
+                    position_bias = 1.0f - abs(relative_pos - decoder_relative);
+                    position_bias *= 0.5f; // Escalar para no dominar
+                }
+                
+                // 3. Pequeña variación aleatoria basada en posición
+                float variation = sin((float)(i * 7 + j * 11)) * 0.1f;
+                
+                attention_score = attention_score * 0.1f + position_bias + variation;
+                
+                // Aplicar softmax
+                attention_score = exp(attention_score);
                 attention_sum += attention_score;
                 
                 // Agregar contribución ponderada del encoder
@@ -108,7 +173,7 @@ Matrix Transformer::applyCrossAttention(const Matrix& decoder_input, const Matri
             
             // Combinar con input original (conexión residual)
             float original_value = decoder_input.getElement(i, d);
-            float final_value = 0.7f * original_value + 0.3f * attended_value;
+            float final_value = 0.5f * original_value + 0.5f * attended_value;
             
             attended_output.setElement(i, d, final_value);
         }
@@ -165,52 +230,74 @@ Matrix Transformer::forward(const std::vector<int> &source_tokens,
         for (int j = 0; j < source_tokens.size(); ++j) {
             cross_attention[j] /= (attention_sum + 1e-8f);
         }
-        
-        for (int v = 0; v < target_vocab_size; ++v) { 
+          for (int v = 0; v < target_vocab_size; ++v) { 
             float similarity = 0.0f;
             
-            // 1. Similitud con embedding del token candidato
+            // 1. Similitud con embedding del token candidato (MÁS PESO)
             std::vector<int> temp_token = {v};
             Matrix vocab_embedding = target_embedding.forward(temp_token);
             
+            float embedding_similarity = 0.0f;
             for (int d = 0; d < std::min(32, (int)d_model); ++d) {
                 float decoder_val = decoder_output.getElement(i, d);
                 float vocab_val = vocab_embedding.getElement(0, d);
-                similarity += decoder_val * vocab_val;
+                embedding_similarity += decoder_val * vocab_val;
             }
-            similarity /= std::min(32, (int)d_model);
+            embedding_similarity /= std::min(32, (int)d_model);
             
-            // 2. Contribución del contexto fuente usando atención cruzada
+            // 2. Contribución del contexto fuente con pesos variables
             float source_context = 0.0f;
             for (int j = 0; j < source_tokens.size(); ++j) {
+                float local_context = 0.0f;
                 for (int d = 0; d < std::min(8, (int)d_model); ++d) {
                     float encoder_val = encoder_output.getElement(j, d);
-                    source_context += encoder_val * cross_attention[j] * ((v + d) % 20 + 1) * 0.01f;
+                    // Usar hash para crear patrones únicos por token
+                    int pattern = (v * 31 + j * 17 + d * 7) % 100;
+                    local_context += encoder_val * (pattern + 1) * 0.005f;
+                }
+                source_context += local_context * cross_attention[j];
+            }
+            
+            // 3. NUEVA: Discriminación por longitud y posición
+            float position_factor = 1.0f;
+            if (target_tokens.size() > 1) {
+                float relative_pos = (float)i / (target_tokens.size() - 1);
+                // Tokens de inicio vs finales tienen diferentes preferencias
+                if (relative_pos < 0.3f) { // Tokens iniciales
+                    if (v < 200) position_factor = 1.2f; // Prefiere tokens comunes
+                } else if (relative_pos > 0.7f) { // Tokens finales
+                    if (v == 3) position_factor = 2.0f; // Prefiere EOS
                 }
             }
-            similarity += source_context;
             
-            // 3. Bias de frecuencia ajustado
-            if (v < 50) similarity += 0.15f;       // Tokens muy comunes
-            else if (v < 200) similarity += 0.1f;  // Tokens comunes  
-            else if (v < 500) similarity += 0.05f; // Tokens moderados
+            // 4. Combinar todos los factores
+            similarity = embedding_similarity * 2.0f + source_context * 1.5f;
+            similarity *= position_factor;
             
-            // 4. Pequeña exploración aleatoria
-            similarity += ((float)rand() / RAND_MAX - 0.5f) * 0.05f;
+            // 5. Bias de frecuencia más agresivo
+            if (v < 30) similarity += 0.25f;        // Top tokens
+            else if (v < 100) similarity += 0.15f;  // Tokens comunes
+            else if (v < 300) similarity += 0.05f;  // Tokens moderados
+            else similarity -= 0.1f;                // Penalizar tokens raros
+            
+            // 6. Exploración reducida para mayor consistencia
+            similarity += ((float)rand() / RAND_MAX - 0.5f) * 0.02f;
             
             output.setElement(i, v, similarity);
         }
-        
-        if (i % 2 == 0) {
+          if (i % 2 == 0) {
             // Encontrar posición source con mayor atención
             int max_attention_pos = 0;
+            float max_attention_val = cross_attention[0];
             for (int j = 1; j < source_tokens.size(); ++j) {
-                if (cross_attention[j] > cross_attention[max_attention_pos]) {
+                if (cross_attention[j] > max_attention_val) {
+                    max_attention_val = cross_attention[j];
                     max_attention_pos = j;
                 }
             }
             std::cout << "[DEBUG] Processed row " << i 
-                      << " (attending to source pos " << max_attention_pos << ")" << std::endl;
+                      << " (attending to source pos " << max_attention_pos 
+                      << " with weight " << std::fixed << std::setprecision(2) << max_attention_val << ")" << std::endl;
         }
     }
     

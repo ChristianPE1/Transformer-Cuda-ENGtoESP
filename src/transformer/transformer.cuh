@@ -28,6 +28,7 @@ public:
     Transformer(size_t input_vocab_size, size_t target_vocab_size,
                 size_t d_model = 512, size_t n_heads = 8,
                 size_t n_layers = 6, size_t d_ff = 2048);    Matrix encode(const std::vector<int> &input_tokens);
+    Matrix applySimpleSelfAttention(const Matrix& input);
     Matrix decode(const std::vector<int> &target_tokens, const Matrix &encoder_output);
     Matrix applyCrossAttention(const Matrix& decoder_input, const Matrix& encoder_output);
     Matrix forward(const std::vector<int> &source_tokens, const std::vector<int> &target_tokens);

@@ -117,9 +117,9 @@ int main()
             std::cout << "\n=== Iniciando Entrenamiento ===" << std::endl;
             
             // Configuración de entrenamiento
-            int epochs = 15;  // Más épocas para mejor aprendizaje
-            int batch_size = 16;  // Batch más pequeño para updates más frecuentes
-            float learning_rate = 0.02f;  // Learning rate un poco más alto
+            int epochs = 10;  // Reducir a 5 para pruebas rápidas
+            int batch_size = 8;   // Batch aún más pequeño para updates más frecuentes
+            float learning_rate = 0.05f;  // Learning rate más agresivo
             
             std::cout << "Configuración:" << std::endl;
             std::cout << "  Épocas: " << epochs << std::endl;
