@@ -9,6 +9,7 @@ class Optimizer {
 public:
     Optimizer(float learning_rate);
     virtual void step(float* params, float* grads, size_t size) = 0;
+    float getLearningRate() const { return learning_rate; }
 
 protected:
     float learning_rate;

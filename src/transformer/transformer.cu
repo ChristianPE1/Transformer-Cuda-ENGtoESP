@@ -4,6 +4,9 @@
 #include <iostream>
 #include <iomanip>
 #include <cmath>
+#include <algorithm>
+#include <cstdlib>
+#include <ctime>
 
 Transformer::Transformer(size_t input_vocab_size, size_t target_vocab_size,size_t d_model, size_t n_heads, size_t n_layers, size_t d_ff)
     : input_vocab_size(input_vocab_size), target_vocab_size(target_vocab_size),
@@ -82,29 +85,31 @@ Matrix Transformer::forward(const std::vector<int> &source_tokens,
 
     // Decode
     Matrix decoder_output = decode(target_tokens, encoder_output);
-    std::cout << "[DEBUG] Decode OK - shape: " << decoder_output.getRows() << "x" << decoder_output.getCols() << std::endl;
-
-    // Project to vocabulary (simplified linear projection)
+    std::cout << "[DEBUG] Decode OK - shape: " << decoder_output.getRows() << "x" << decoder_output.getCols() << std::endl;    // Project to vocabulary (simplified linear projection)
     Matrix output(target_tokens.size(), target_vocab_size, 0.0f);
     std::cout << "[DEBUG] Created output matrix: " << output.getRows() << "x" << output.getCols() << std::endl;
 
-    // PROYECCIÓN MÁS ROBUSTA - Valores más grandes y variados
+    // PROYECCIÓN MEJORADA - Más variabilidad y valores realistas
+    srand(time(nullptr)); // Inicializar semilla aleatoria
+    
     for (int i = 0; i < target_tokens.size(); ++i) {
         for (int v = 0; v < target_vocab_size; ++v) { 
-            // Proyección que garantiza valores no-cero
             float projection = 0.0f;
             
-            // Base: valor aleatorio basado en posición
-            projection += (float)((i + v) % 10) * 0.1f;
+            // Base aleatoria para diversidad
+            projection += ((float)rand() / RAND_MAX - 0.5f) * 2.0f; // -1 a 1
             
-            // Contribución del decoder (amplificada)
-            for (int d = 0; d < std::min(5, (int)d_model); ++d) {
+            // Contribución del decoder (más significativa)
+            for (int d = 0; d < std::min(10, (int)d_model); ++d) {
                 float decoder_val = decoder_output.getElement(i, d);
-                projection += decoder_val * (v % 20 + 1) * 0.5f; // Amplifica la contribución
+                projection += decoder_val * ((v + d) % 50 + 1) * 0.1f;
             }
             
-            // Asegurar diversidad en scores
-            projection += (float)(v % 100) * 0.01f; // Bias por vocabulario
+            // Bias basado en posición y vocabulario para variedad
+            projection += sin((float)(i * v + v) * 0.01f) * 0.5f;
+            
+            // Normalizar para que esté en un rango razonable
+            projection = projection * 0.5f + ((float)v / target_vocab_size) * 0.1f;
             
             output.setElement(i, v, projection);
         }
@@ -128,32 +133,63 @@ int sos_token, int eos_token, size_t max_length)
 
         // Get last token predictions
         int last_pos = generated.size() - 1;
-        int best_token = 0;
-        float best_score = output.getElement(last_pos, 0);
-
-        // BUSCA EN MÁS PALABRAS DEL VOCABULARIO
-        int search_limit = std::min(1000, (int)target_vocab_size); // Busca en 1000 palabras
         
-        for (int v = 1; v < search_limit; ++v)
+        // Buscar el mejor token con algo de aleatoriedad
+        std::vector<std::pair<float, int>> candidates;
+        int search_limit = std::min(1000, (int)target_vocab_size);
+        
+        for (int v = 0; v < search_limit; ++v)
         {
             float score = output.getElement(last_pos, v);
-            if (score > best_score)
-            {
-                best_score = score;
-                best_token = v;
+            candidates.push_back({score, v});
+        }
+        
+        // Ordenar por score descendente
+        std::sort(candidates.begin(), candidates.end(), std::greater<std::pair<float, int>>());
+        
+        // Seleccionar entre los top 5 tokens con probabilidades
+        int best_token = candidates[0].second;
+        float best_score = candidates[0].first;
+        
+        // Agregar algo de aleatoriedad en los primeros pasos
+        if (step < 3 && candidates.size() > 5) {
+            // Usar los top 5 con probabilidades basadas en temperature
+            float temperature = 1.2f; // Aumentar para más variedad
+            std::vector<float> probs(5);
+            float sum = 0.0f;
+            
+            for (int i = 0; i < 5; ++i) {
+                probs[i] = exp(candidates[i].first / temperature);
+                sum += probs[i];
+            }
+            
+            // Normalizar probabilidades
+            for (int i = 0; i < 5; ++i) {
+                probs[i] /= sum;
+            }
+            
+            // Selección basada en probabilidad (simplificada)
+            float rand_val = ((float)rand() / RAND_MAX);
+            float cumsum = 0.0f;
+            for (int i = 0; i < 5; ++i) {
+                cumsum += probs[i];
+                if (rand_val <= cumsum) {
+                    best_token = candidates[i].second;
+                    best_score = candidates[i].first;
+                    break;
+                }
             }
         }
 
-        // DEBUG: Muestra los top 3 tokens y algunos scores
+        // DEBUG: Muestra información de generación
         if (step < 3) {
             std::cout << "[GEN] Step " << step << " - Best token: " << best_token 
-                      << " (score: " << best_score << ")";
+                      << " (score: " << std::fixed << std::setprecision(1) << best_score << ")";
             
             // Mostrar algunos scores para debug
-            std::cout << " [Scores: ";
-            for (int i = 0; i < 5; ++i) {
-                float score = output.getElement(last_pos, i);
-                std::cout << i << ":" << std::fixed << std::setprecision(1) << score << " ";
+            std::cout << " [Top scores: ";
+            for (int i = 0; i < std::min(5, (int)candidates.size()); ++i) {
+                std::cout << candidates[i].second << ":" << std::fixed << std::setprecision(1) << candidates[i].first << " ";
             }
             std::cout << "]" << std::endl;
         }
@@ -173,11 +209,33 @@ int sos_token, int eos_token, size_t max_length)
 void Transformer::updateWeights(const Matrix& gradients, float learning_rate) {
     std::cout << "[UPDATE] Aplicando gradientes con lr=" << learning_rate << std::endl;
     
+    // Verificar que el learning rate no sea cero
+    if (learning_rate == 0.0f) {
+        std::cout << "[UPDATE] WARNING: Learning rate es 0! Los pesos no se actualizarán." << std::endl;
+        return;
+    }
+    
     // Usar los tokens del último forward pass
     if (!last_target_tokens.empty()) {
         try {
+            // Verificar dimensiones de gradientes
+            std::cout << "[UPDATE] Gradientes: " << gradients.getRows() << "x" << gradients.getCols() << std::endl;
+            std::cout << "[UPDATE] Tokens objetivo: " << last_target_tokens.size() << std::endl;
+            
             target_embedding.updateWeights(gradients, learning_rate, last_target_tokens);
-            std::cout << "[UPDATE] Target embeddings actualizados para " << last_target_tokens.size() << " tokens" << std::endl;
+            std::cout << "[UPDATE] Target embeddings actualizados exitosamente para " << last_target_tokens.size() << " tokens" << std::endl;
+            
+            // Log algunos valores de ejemplo para debug
+            std::vector<float> sample_grads;
+            gradients.copyToHost(sample_grads);
+            if (!sample_grads.empty()) {
+                std::cout << "[UPDATE] Muestra de gradientes: ";
+                for (int i = 0; i < std::min(5, (int)sample_grads.size()); ++i) {
+                    std::cout << std::fixed << std::setprecision(4) << sample_grads[i] << " ";
+                }
+                std::cout << std::endl;
+            }
+            
         } catch (const std::exception& e) {
             std::cout << "[UPDATE] Error actualizando embeddings: " << e.what() << std::endl;
         }

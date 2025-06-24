@@ -39,12 +39,11 @@ void Trainer::train(const std::vector<std::vector<int>>& source_batches, const s
             // 2. Loss simplificado
             double loss = loss_fn.forward(output, target);
             std::cout << " [FAST-LOSS] batch:" << target_length << " classes:" << num_classes << " loss:" << std::fixed << std::setprecision(1) << loss;
-            
-            // 3. Backward pass - AHORA SÍ ACTUALIZA LOS PESOS
+              // 3. Backward pass - AHORA SÍ ACTUALIZA LOS PESOS
             Matrix grad = loss_fn.backward(output, target);
             
-            // SIMPLE WEIGHT UPDATE - Actualiza directamente los embeddings
-            model.updateWeights(grad, 0.01f); // learning rate más alto
+            // SIMPLE WEIGHT UPDATE - Usa el learning rate del optimizador
+            model.updateWeights(grad, optimizer.getLearningRate());
             
             std::cout << " Loss: " << std::fixed << std::setprecision(1) << loss << std::endl;
             
