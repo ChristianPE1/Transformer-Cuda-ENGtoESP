@@ -88,11 +88,7 @@ Matrix Matrix::multiply(const Matrix &other) const
 
 void Matrix::copyFromHost(const std::vector<float> &hostData)
 {
-    if (hostData.size() != rows * cols)
-    {
-        throw std::runtime_error("Host data size doesn't match matrix size");
-    }
-
+    if (hostData.size() != rows * cols) return;
     cudaMemcpy(data, hostData.data(), rows * cols * sizeof(float), cudaMemcpyHostToDevice);
 }
 

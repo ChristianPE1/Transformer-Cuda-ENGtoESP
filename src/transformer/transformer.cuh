@@ -16,6 +16,7 @@ private:
     Embedding input_embedding;
     Embedding target_embedding;
     PositionalEncoding pos_encoding;
+    Matrix projection_weights;  // new projection weights for final output
     size_t d_model;
     size_t n_layers;
     size_t input_vocab_size;
