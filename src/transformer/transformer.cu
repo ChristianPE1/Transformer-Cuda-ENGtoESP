@@ -22,7 +22,11 @@ Transformer::Transformer(size_t input_vocab_size, size_t target_vocab_size,
     // Inicializar pesos de proyección con valores aleatorios
     std::vector<float> proj_data(d_model * target_vocab_size);
     for (size_t i = 0; i < proj_data.size(); ++i) {
-        proj_data[i] = ((float)rand() / RAND_MAX - 0.5f) * 0.1f;
+        // Inicialización actual
+        // proj_data[i] = ((float)rand() / RAND_MAX - 0.5f) * 0.1f;
+
+        // Cambiar por (valores más grandes)
+        proj_data[i] = ((float)rand() / RAND_MAX - 0.5f) * 1.0f; // 10x más grande
     }
     projection_weights.copyFromHost(proj_data);
     
@@ -92,7 +96,15 @@ Matrix Transformer::forward(const std::vector<int> &source_tokens,
 
     // USAR PESOS REALES DE PROYECCIÓN
     Matrix logits = decoder_output.matrixMultiply(projection_weights);
-    
+
+    // Añadir esta línea: Bias para forzar ciertos tokens
+    // Forzar token 50 (o cualquier otro token común)
+    for (int i = 0; i < logits.getRows(); i++) {
+        logits.setElement(i, 50, logits.getElement(i, 50) + 5.0f); // Bias grande
+        logits.setElement(i, 51, logits.getElement(i, 51) + 4.0f);
+        logits.setElement(i, 52, logits.getElement(i, 52) + 3.0f);
+    }
+
     // Softmax en GPU
     Matrix output = logits.softmax();
     
@@ -135,6 +147,15 @@ int sos_token, int eos_token, size_t max_length)
         if (best_token == eos_token && generated.size() > 2) {
             break;
         }
+    }
+
+    // Añade este debug
+    std::cout << "[DEBUG] Checking projection_weights:" << std::endl;
+    for (int i = 0; i < std::min(5, (int)d_model); i++) {
+        for (int j = 0; j < std::min(5, (int)target_vocab_size); j++) {
+            std::cout << projection_weights.getElement(i, j) << " ";
+        }
+        std::cout << std::endl;
     }
 
     return generated;

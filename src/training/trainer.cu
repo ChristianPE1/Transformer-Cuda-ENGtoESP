@@ -44,7 +44,7 @@ void Trainer::train(const std::vector<std::vector<int>>& source_batches, const s
             Matrix grad = loss_fn.backward(output, target);
             
             // SIMPLE WEIGHT UPDATE - Actualiza directamente los embeddings
-            model.updateWeights(grad, 0.01f); // learning rate más alto
+            model.updateWeights(grad, 0.5f); // Learning rate MUCHO más alto
             
             std::cout << " Loss: " << std::fixed << std::setprecision(1) << loss << std::endl;
             
