@@ -4,6 +4,7 @@
 
 #include <cuda_runtime.h>
 #include <iostream>
+#include <iomanip>
 #include "utils/matrix.cuh"
 
 class Loss {
