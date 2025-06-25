@@ -162,9 +162,9 @@ Matrix Transformer::forward(const std::vector<int> &source_tokens,
 {
     std::cout << "[DEBUG] Forward - source: " << source_tokens.size() 
               << " tokens, target: " << target_tokens.size() << " tokens" << std::endl;
-    
-    // Store target tokens for later gradient updates
+      // Store tokens for later gradient updates
     last_target_tokens = target_tokens;
+    last_source_tokens = source_tokens;  // NUEVO: Almacenar también source tokens
     
     // Encode with improved processing
     Matrix encoder_output = encode(source_tokens);
@@ -427,7 +427,7 @@ int sos_token, int eos_token, size_t max_length)
 }
 
 void Transformer::updateWeights(const Matrix& gradients, float learning_rate) {
-    std::cout << "[UPDATE] Aplicando gradientes con lr=" << learning_rate << std::endl;
+    std::cout << "[UPDATE] Aplicando gradientes con lr=" << std::fixed << std::setprecision(3) << learning_rate << std::endl;
     
     // Verificar que el learning rate no sea cero
     if (learning_rate == 0.0f) {
@@ -442,7 +442,37 @@ void Transformer::updateWeights(const Matrix& gradients, float learning_rate) {
             std::cout << "[UPDATE] Gradientes: " << gradients.getRows() << "x" << gradients.getCols() << std::endl;
             std::cout << "[UPDATE] Tokens objetivo: " << last_target_tokens.size() << std::endl;
             
+            // 1. Actualizar embeddings del target (principal)
             target_embedding.updateWeights(gradients, learning_rate, last_target_tokens);
+            
+            // 2. NUEVO: Actualizar también embeddings del source usando gradientes propagados
+            if (!last_source_tokens.empty()) {
+                // Crear gradientes sintéticos para source embeddings basados en los del target
+                Matrix source_gradients(last_source_tokens.size(), d_model, 0.0f);
+                
+                // Propagar gradientes del target al source (atención cruzada inversa)
+                for (int i = 0; i < last_source_tokens.size(); ++i) {
+                    for (int d = 0; d < std::min(32, (int)d_model); ++d) {
+                        float accumulated_grad = 0.0f;
+                        
+                        // Acumular gradientes de todas las posiciones target que atendieron a esta posición source
+                        for (int j = 0; j < last_target_tokens.size(); ++j) {
+                            if (j < gradients.getRows() && d < gradients.getCols()) {
+                                float target_grad = gradients.getElement(j, d % gradients.getCols());
+                                // Peso basado en atención estimada
+                                float attention_weight = 1.0f / last_source_tokens.size(); // Uniforme por simplicidad
+                                accumulated_grad += target_grad * attention_weight * 0.1f; // Factor de escala
+                            }
+                        }
+                        
+                        source_gradients.setElement(i, d, accumulated_grad);
+                    }
+                }
+                
+                input_embedding.updateWeights(source_gradients, learning_rate * 0.5f, last_source_tokens);
+                std::cout << "[UPDATE] Source embeddings actualizados para " << last_source_tokens.size() << " tokens" << std::endl;
+            }
+            
             std::cout << "[UPDATE] Target embeddings actualizados exitosamente para " << last_target_tokens.size() << " tokens" << std::endl;
             
             // Log algunos valores de ejemplo para debug

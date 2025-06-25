@@ -20,9 +20,9 @@ private:
     size_t n_layers;
     size_t input_vocab_size;
     size_t target_vocab_size;
-    
-    // Store tokens from last forward pass for gradient updates
+      // Store tokens from last forward pass for gradient updates
     std::vector<int> last_target_tokens;
+    std::vector<int> last_source_tokens;
 
 public:
     Transformer(size_t input_vocab_size, size_t target_vocab_size,
