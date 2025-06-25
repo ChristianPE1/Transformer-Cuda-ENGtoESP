@@ -22,7 +22,7 @@ private:
 public:
     MultiHeadAttention(size_t d_model, size_t num_heads = 8);
     
-    Matrix forward(const Matrix& query, const Matrix& key, const Matrix& value, bool use_causal_mask = false);
+    Matrix forward(const Matrix& query, const Matrix& key, const Matrix& value, const Matrix* mask = nullptr);
     
     // For gradient updates
     void updateWeights(const Matrix& grad_q, const Matrix& grad_k, const Matrix& grad_v, const Matrix& grad_o, float lr);

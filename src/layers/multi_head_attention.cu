@@ -17,7 +17,7 @@ MultiHeadAttention::MultiHeadAttention(size_t d_model, size_t num_heads)
     std::cout << "[MHA] Initialized with " << num_heads << " heads, d_k=" << d_k << std::endl;
 }
 
-Matrix MultiHeadAttention::forward(const Matrix& query, const Matrix& key, const Matrix& value, bool use_causal_mask) {
+Matrix MultiHeadAttention::forward(const Matrix& query, const Matrix& key, const Matrix& value, const Matrix* mask) {
     int seq_len = query.getRows();
     
     // 1. Linear transformations Q, K, V
@@ -34,7 +34,7 @@ Matrix MultiHeadAttention::forward(const Matrix& query, const Matrix& key, const
     // 3. Apply scaled dot-product attention for each head
     std::vector<Matrix> attention_outputs;
     for (size_t h = 0; h < num_heads; ++h) {
-        Matrix head_output = computeAttention(Q_heads[h], K_heads[h], V_heads[h], use_causal_mask);
+        Matrix head_output = computeAttention(Q_heads[h], K_heads[h], V_heads[h], mask != nullptr);
         attention_outputs.push_back(head_output);
     }
     
