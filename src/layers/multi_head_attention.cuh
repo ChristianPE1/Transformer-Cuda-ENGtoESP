@@ -15,7 +15,7 @@ private:
     Matrix W_q, W_k, W_v, W_o;
     
     // Helper methods
-    Matrix computeAttention(const Matrix& Q, const Matrix& K, const Matrix& V, bool use_mask = false);
+    Matrix computeAttention(const Matrix& Q, const Matrix& K, const Matrix& V, const Matrix* mask = nullptr);
     void splitHeads(const Matrix& input, std::vector<Matrix>& heads);
     Matrix combineHeads(const std::vector<Matrix>& heads);
 

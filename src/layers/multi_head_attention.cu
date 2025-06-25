@@ -34,7 +34,7 @@ Matrix MultiHeadAttention::forward(const Matrix& query, const Matrix& key, const
     // 3. Apply scaled dot-product attention for each head
     std::vector<Matrix> attention_outputs;
     for (size_t h = 0; h < num_heads; ++h) {
-        Matrix head_output = computeAttention(Q_heads[h], K_heads[h], V_heads[h], mask != nullptr);
+        Matrix head_output = computeAttention(Q_heads[h], K_heads[h], V_heads[h], mask);
         attention_outputs.push_back(head_output);
     }
     
@@ -95,7 +95,7 @@ Matrix MultiHeadAttention::combineHeads(const std::vector<Matrix>& heads) {
     return combined;
 }
 
-Matrix MultiHeadAttention::computeAttention(const Matrix& Q, const Matrix& K, const Matrix& V, bool use_mask) {
+Matrix MultiHeadAttention::computeAttention(const Matrix& Q, const Matrix& K, const Matrix& V, const Matrix* mask) {
     int seq_len_q = Q.getRows();
     int seq_len_k = K.getRows();
     int d_k_actual = Q.getCols();
@@ -115,9 +115,12 @@ Matrix MultiHeadAttention::computeAttention(const Matrix& Q, const Matrix& K, co
             // Scale by sqrt(d_k)
             score /= sqrtf((float)d_k_actual);
             
-            // Apply causal mask if needed
-            if (use_mask && j > i) {
-                score = -1e9f; // Large negative value for masked positions
+            // Apply mask if provided
+            if (mask != nullptr) {
+                float mask_value = mask->getElement(i, j);
+                if (mask_value == 0.0f) {
+                    score = -1e9f; // Large negative value for masked positions
+                }
             }
             
             scores.setElement(i, j, score);

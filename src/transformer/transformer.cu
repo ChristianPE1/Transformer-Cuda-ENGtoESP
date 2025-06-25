@@ -80,7 +80,7 @@ Matrix Transformer::encode(const std::vector<int> &input_tokens)
 
 Matrix Transformer::applyEncoderLayer(const Matrix& input, int layer_idx) {
     // 1. Multi-Head Self-Attention with residual connection
-    Matrix attention_output = encoder_self_attention[layer_idx]->forward(input, input, input, false);
+    Matrix attention_output = encoder_self_attention[layer_idx]->forward(input, input, input, nullptr);
     Matrix after_attention = input.add(attention_output); // Residual connection
     after_attention = applyLayerNorm(after_attention);    // Layer norm
     
@@ -125,12 +125,21 @@ Matrix Transformer::decode(const std::vector<int> &target_tokens,
 
 Matrix Transformer::applyDecoderLayer(const Matrix& input, const Matrix& encoder_output, int layer_idx) {
     // 1. Masked Multi-Head Self-Attention with residual connection
-    Matrix self_attention_output = decoder_self_attention[layer_idx]->forward(input, input, input, true); // Causal mask
+    // Create causal mask for decoder self-attention
+    int seq_len = input.getRows();
+    Matrix causal_mask(seq_len, seq_len);
+    for (int i = 0; i < seq_len; ++i) {
+        for (int j = 0; j < seq_len; ++j) {
+            causal_mask.setElement(i, j, (j <= i) ? 1.0f : 0.0f);
+        }
+    }
+    
+    Matrix self_attention_output = decoder_self_attention[layer_idx]->forward(input, input, input, &causal_mask);
     Matrix after_self_attention = input.add(self_attention_output); // Residual connection
     after_self_attention = applyLayerNorm(after_self_attention);    // Layer norm
     
     // 2. Cross-Attention (encoder-decoder attention) with residual connection
-    Matrix cross_attention_output = decoder_cross_attention[layer_idx]->forward(after_self_attention, encoder_output, encoder_output, false);
+    Matrix cross_attention_output = decoder_cross_attention[layer_idx]->forward(after_self_attention, encoder_output, encoder_output, nullptr);
     Matrix after_cross_attention = after_self_attention.add(cross_attention_output); // Residual connection
     after_cross_attention = applyLayerNorm(after_cross_attention); // Layer norm
     
