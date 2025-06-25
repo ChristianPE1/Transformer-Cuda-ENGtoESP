@@ -33,6 +33,8 @@ public:
     // Matrix operations
     __host__ Matrix add(const Matrix &other) const;
     __host__ Matrix multiply(const Matrix &other) const;
+    __host__ Matrix transpose() const;
+    __host__ void randomInitialize(float min_val, float max_val);
 
     // Element access
     __host__ float getElement(int row, int col) const;

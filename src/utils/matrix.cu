@@ -3,6 +3,7 @@
 #include <iostream>
 #include <cmath>
 #include <stdexcept>
+#include <cstdlib>
 
 __global__ void matrixAddKernel(float *a, float *b, float *result, int size)
 {
@@ -81,8 +82,29 @@ Matrix Matrix::add(const Matrix &other) const
 
 Matrix Matrix::multiply(const Matrix &other) const
 {
-    // Implementación simplificada
+    if (cols != other.rows) {
+        throw std::runtime_error("Matrix dimensions don't match for multiplication");
+    }
+
     Matrix result(rows, other.cols);
+    
+    // Simple CPU implementation for matrix multiplication
+    std::vector<float> host_a(rows * cols);
+    std::vector<float> host_b(other.rows * other.cols);
+    copyToHost(host_a);
+    other.copyToHost(host_b);
+    
+    std::vector<float> host_result(rows * other.cols, 0.0f);
+    
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < other.cols; ++j) {
+            for (int k = 0; k < cols; ++k) {
+                host_result[i * other.cols + j] += host_a[i * cols + k] * host_b[k * other.cols + j];
+            }
+        }
+    }
+    
+    result.copyFromHost(host_result);
     return result;
 }
 
@@ -112,4 +134,31 @@ float Matrix::getElement(int row, int col) const
 void Matrix::setElement(int row, int col, float value)
 {
     cudaMemcpy(&data[row * cols + col], &value, sizeof(float), cudaMemcpyHostToDevice);
+}
+
+void Matrix::randomInitialize(float min_val, float max_val) {
+    std::vector<float> host_data(rows * cols);
+    for (int i = 0; i < rows * cols; ++i) {
+        float random_val = ((float)rand() / RAND_MAX) * (max_val - min_val) + min_val;
+        host_data[i] = random_val;
+    }
+    copyFromHost(host_data);
+}
+
+Matrix Matrix::transpose() const {
+    Matrix result(cols, rows);
+    
+    // Simple CPU implementation for now
+    std::vector<float> host_data(rows * cols);
+    copyToHost(host_data);
+    
+    std::vector<float> transposed_data(cols * rows);
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < cols; ++j) {
+            transposed_data[j * rows + i] = host_data[i * cols + j];
+        }
+    }
+    
+    result.copyFromHost(transposed_data);
+    return result;
 }
