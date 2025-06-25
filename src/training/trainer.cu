@@ -43,15 +43,15 @@ void Trainer::train(const std::vector<std::vector<int>>& source_batches, const s
             
             // DEBUG: Verificar learning rate
             float lr = optimizer.getLearningRate();
-            std::cout << " [DEBUG-LR: " << lr << "]";
+            std::cout << " [DEBUG-LR: " << std::fixed << std::setprecision(3) << lr << "]";
             
-            // SIMPLE WEIGHT UPDATE - Usa un learning rate fijo si el optimizador falla
-            if (lr == 0.0f) {
-                std::cout << " [USANDO LR FIJO]";
-                model.updateWeights(grad, 0.02f); // Learning rate fijo como fallback
-            } else {
-                model.updateWeights(grad, lr);
+            // FORZAR UN LEARNING RATE MÍNIMO SI ES 0
+            if (lr <= 0.0f) {
+                std::cout << " [LR ERA 0! USANDO 0.02]";
+                lr = 0.02f; // Usar un learning rate fijo
             }
+            
+            model.updateWeights(grad, lr);
             
             std::cout << " Loss: " << std::fixed << std::setprecision(1) << loss << std::endl;
               } catch (const std::exception& e) {

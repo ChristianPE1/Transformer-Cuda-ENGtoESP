@@ -1,6 +1,7 @@
 // src/training/optimizer.cu
 #include "optimizer.cuh"
 #include "utils/cuda_utils.cuh"
+#include <iostream>
 
 __global__ void updateWeightsKernel(float *weights, float *gradients, float learning_rate, int size) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -9,11 +10,12 @@ __global__ void updateWeightsKernel(float *weights, float *gradients, float lear
     }
 }
 
-Optimizer::Optimizer(float learning_rate) : learning_rate(learning_rate) {}
+Optimizer::Optimizer(float learning_rate) : learning_rate(learning_rate) {
+    std::cout << "[OPTIMIZER] Inicializado con LR: " << learning_rate << std::endl;
+}
 
 SGD::SGD(float learning_rate) : Optimizer(learning_rate) {
-    // Constructor implementation
-    
+    std::cout << "[SGD] Inicializado con LR: " << learning_rate << std::endl;
 }
 
 void SGD::step(float* params, float* grads, size_t size) {
