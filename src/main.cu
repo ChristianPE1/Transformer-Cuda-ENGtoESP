@@ -114,10 +114,12 @@ int main()
             std::cout << "Generated: " << spa_vocab.idsToSentence(generated) << std::endl;
             
             // AGREGAR ENTRENAMIENTO AQUÍ:
-            std::cout << "\n=== Iniciando Entrenamiento ===" << std::endl;            // Configuración de entrenamiento
-            int epochs = 10;  // Más épocas para mejor aprendizaje
-            int batch_size = 16;  // Batch AÚN más pequeño para updates más frecuentes
-            float learning_rate = 0.5f;  // Learning rate MUCHO más alto para gradientes pequeños
+            std::cout << "\n=== Iniciando Entrenamiento ===" << std::endl;
+            
+            // Configuración de entrenamiento
+            int epochs = 10;  // Empezar con pocas épocas para probar
+            int batch_size = 16;
+            float learning_rate = 0.01f;  // AUMENTAR EL LEARNING RATE
             
             std::cout << "Configuración:" << std::endl;
             std::cout << "  Épocas: " << epochs << std::endl;
@@ -146,13 +148,12 @@ int main()
                 
                 // Entrenar
                 trainer.train(source_batches, target_batches);
-                  // Probar generación cada 5 épocas para ver progreso
-                if ((epoch + 1) % 5 == 0) {
-                    std::cout << "  === Progreso en época " << (epoch + 1) << " ===" << std::endl;
-                    auto gen = transformer.generate(source_ids, 2, 3, 8);
-                    std::cout << "  ENG: " << eng_vocab.idsToSentence(source_ids) << std::endl;
-                    std::cout << "  ESP: " << spa_vocab.idsToSentence(gen) << std::endl;
-                    std::cout << "  ================================" << std::endl;
+                
+                // Probar generación cada época
+                if ((epoch + 1) % 1 == 0) {
+                    std::cout << "  Probando generación..." << std::endl;
+                    auto gen = transformer.generate(source_ids, 2, 3, 10);
+                    std::cout << "  Generated: " << spa_vocab.idsToSentence(gen) << std::endl;
                 }
             }
             

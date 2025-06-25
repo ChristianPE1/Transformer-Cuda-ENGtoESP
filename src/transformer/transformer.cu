@@ -10,17 +10,42 @@
 
 Transformer::Transformer(size_t input_vocab_size, size_t target_vocab_size,size_t d_model, size_t n_heads, size_t n_layers, size_t d_ff)
     : input_vocab_size(input_vocab_size), target_vocab_size(target_vocab_size),
-      d_model(d_model), n_layers(n_layers),
+      d_model(d_model), n_layers(n_layers), n_heads(n_heads), d_ff(d_ff),
       input_embedding(input_vocab_size, d_model),
       target_embedding(target_vocab_size, d_model),
       pos_encoding(d_model)
 {
+    // Initialize multi-layer components
+    encoder_self_attention.reserve(n_layers);
+    encoder_ffn.reserve(n_layers);
+    decoder_self_attention.reserve(n_layers);
+    decoder_cross_attention.reserve(n_layers);
+    decoder_ffn.reserve(n_layers);
+    
+    for (size_t i = 0; i < n_layers; ++i) {
+        encoder_self_attention.push_back(new MultiHeadAttention(d_model, n_heads));
+        encoder_ffn.push_back(new FeedForward(d_model, d_ff));
+        decoder_self_attention.push_back(new MultiHeadAttention(d_model, n_heads));
+        decoder_cross_attention.push_back(new MultiHeadAttention(d_model, n_heads));
+        decoder_ffn.push_back(new FeedForward(d_model, d_ff));
+    }
 
-    std::cout << "Transformer initialized:" << std::endl;
+    std::cout << "Transformer initialized with FULL ARCHITECTURE:" << std::endl;
     std::cout << "  Input vocab: " << input_vocab_size << std::endl;
     std::cout << "  Target vocab: " << target_vocab_size << std::endl;
     std::cout << "  d_model: " << d_model << std::endl;
-    std::cout << "  layers: " << n_layers << std::endl;
+    std::cout << "  n_heads: " << n_heads << std::endl;
+    std::cout << "  n_layers: " << n_layers << std::endl;
+    std::cout << "  d_ff: " << d_ff << std::endl;
+}
+
+Transformer::~Transformer() {
+    // Clean up dynamically allocated components
+    for (auto* attn : encoder_self_attention) delete attn;
+    for (auto* ffn : encoder_ffn) delete ffn;
+    for (auto* attn : decoder_self_attention) delete attn;
+    for (auto* attn : decoder_cross_attention) delete attn;
+    for (auto* ffn : decoder_ffn) delete ffn;
 }
 
 Matrix Transformer::encode(const std::vector<int> &input_tokens)
@@ -41,10 +66,30 @@ Matrix Transformer::encode(const std::vector<int> &input_tokens)
     Matrix pos_enc = pos_encoding.getEncoding(input_tokens.size());
     Matrix encoder_input = embeddings.add(pos_enc);
 
-    // Apply simple layer normalization
-    encoder_input = applyLayerNorm(encoder_input);
+    // Apply multiple encoder layers
+    Matrix current_layer_output = encoder_input;
+    for (size_t layer = 0; layer < n_layers; ++layer) {
+        current_layer_output = applyEncoderLayer(current_layer_output, layer);
+    }
 
-    return encoder_input;
+    // Final layer normalization
+    current_layer_output = applyLayerNorm(current_layer_output);
+
+    return current_layer_output;
+}
+
+Matrix Transformer::applyEncoderLayer(const Matrix& input, int layer_idx) {
+    // 1. Multi-Head Self-Attention with residual connection
+    Matrix attention_output = encoder_self_attention[layer_idx]->forward(input, input, input, false);
+    Matrix after_attention = input.add(attention_output); // Residual connection
+    after_attention = applyLayerNorm(after_attention);    // Layer norm
+    
+    // 2. Feed-Forward Network with residual connection
+    Matrix ffn_output = encoder_ffn[layer_idx]->forward(after_attention);
+    Matrix layer_output = after_attention.add(ffn_output); // Residual connection
+    layer_output = applyLayerNorm(layer_output);           // Layer norm
+    
+    return layer_output;
 }
 
 Matrix Transformer::decode(const std::vector<int> &target_tokens,
@@ -66,17 +111,35 @@ Matrix Transformer::decode(const std::vector<int> &target_tokens,
     Matrix pos_enc = pos_encoding.getEncoding(target_tokens.size());
     Matrix decoder_input = embeddings.add(pos_enc);
 
-    // Apply layer normalization
-    decoder_input = applyLayerNorm(decoder_input);
+    // Apply multiple decoder layers
+    Matrix current_layer_output = decoder_input;
+    for (size_t layer = 0; layer < n_layers; ++layer) {
+        current_layer_output = applyDecoderLayer(current_layer_output, encoder_output, layer);
+    }
 
-    // Enhanced cross-attention with residual connections
-    Matrix attended_output = applyCrossAttention(decoder_input, encoder_output);
+    // Final layer normalization
+    current_layer_output = applyLayerNorm(current_layer_output);
+
+    return current_layer_output;
+}
+
+Matrix Transformer::applyDecoderLayer(const Matrix& input, const Matrix& encoder_output, int layer_idx) {
+    // 1. Masked Multi-Head Self-Attention with residual connection
+    Matrix self_attention_output = decoder_self_attention[layer_idx]->forward(input, input, input, true); // Causal mask
+    Matrix after_self_attention = input.add(self_attention_output); // Residual connection
+    after_self_attention = applyLayerNorm(after_self_attention);    // Layer norm
     
-    // Residual connection + layer norm
-    Matrix decoder_output = decoder_input.add(attended_output);
-    decoder_output = applyLayerNorm(decoder_output);
-
-    return decoder_output;
+    // 2. Cross-Attention (encoder-decoder attention) with residual connection
+    Matrix cross_attention_output = decoder_cross_attention[layer_idx]->forward(after_self_attention, encoder_output, encoder_output, false);
+    Matrix after_cross_attention = after_self_attention.add(cross_attention_output); // Residual connection
+    after_cross_attention = applyLayerNorm(after_cross_attention); // Layer norm
+    
+    // 3. Feed-Forward Network with residual connection
+    Matrix ffn_output = decoder_ffn[layer_idx]->forward(after_cross_attention);
+    Matrix layer_output = after_cross_attention.add(ffn_output); // Residual connection
+    layer_output = applyLayerNorm(layer_output);                 // Layer norm
+    
+    return layer_output;
 }
 
 // Simple layer normalization implementation
@@ -110,51 +173,6 @@ Matrix Transformer::applyLayerNorm(const Matrix& input) {
     }
     
     return output;
-}
-
-// Nueva función de atención cruzada simple
-Matrix Transformer::applyCrossAttention(const Matrix& decoder_input, const Matrix& encoder_output) {
-    int decoder_len = decoder_input.getRows();
-    int encoder_len = encoder_output.getRows();
-    int d_model = decoder_input.getCols();
-    
-    Matrix attended_output(decoder_len, d_model, 0.0f);
-    
-    for (int i = 0; i < decoder_len; ++i) {
-        for (int d = 0; d < d_model; ++d) {
-            float attended_value = 0.0f;
-            float attention_sum = 0.0f;
-            
-            // Calcular atención entre posición i del decoder y todas las del encoder
-            for (int j = 0; j < encoder_len; ++j) {
-                // Peso de atención simple basado en producto punto
-                float attention_score = 0.0f;
-                for (int k = 0; k < std::min(16, d_model); ++k) {
-                    attention_score += decoder_input.getElement(i, k) * encoder_output.getElement(j, k);
-                }
-                
-                // Normalizar y aplicar softmax simple
-                attention_score = exp(attention_score * 0.1f); // Temperature para suavizar
-                attention_sum += attention_score;
-                
-                // Agregar contribución ponderada del encoder
-                attended_value += attention_score * encoder_output.getElement(j, d);
-            }
-            
-            // Normalizar por la suma de pesos de atención
-            if (attention_sum > 0) {
-                attended_value /= attention_sum;
-            }
-            
-            // Combinar con input original (conexión residual)
-            float original_value = decoder_input.getElement(i, d);
-            float final_value = 0.7f * original_value + 0.3f * attended_value;
-            
-            attended_output.setElement(i, d, final_value);
-        }
-    }
-    
-    return attended_output;
 }
 
 Matrix Transformer::forward(const std::vector<int> &source_tokens,
@@ -443,7 +461,7 @@ void Transformer::updateWeights(const Matrix& gradients, float learning_rate) {
             // 1. Actualizar embeddings del target (principal)
             target_embedding.updateWeights(gradients, learning_rate, last_target_tokens);
             
-            // 2. NUEVO: Actualizar también embeddings del source usando gradientes propagados
+            // 2. Actualizar también embeddings del source usando gradientes propagados
             if (!last_source_tokens.empty()) {
                 // Crear gradientes sintéticos para source embeddings basados en los del target
                 Matrix source_gradients(last_source_tokens.size(), d_model, 0.0f);
@@ -471,7 +489,22 @@ void Transformer::updateWeights(const Matrix& gradients, float learning_rate) {
                 std::cout << "[UPDATE] Source embeddings actualizados para " << last_source_tokens.size() << " tokens" << std::endl;
             }
             
+            // 3. NUEVO: Actualizar componentes Multi-Head Attention
+            Matrix dummy_grad(d_model, d_model, 0.0f); // Gradientes simplificados
+            for (size_t layer = 0; layer < n_layers; ++layer) {
+                encoder_self_attention[layer]->updateWeights(dummy_grad, dummy_grad, dummy_grad, dummy_grad, learning_rate * 0.1f);
+                decoder_self_attention[layer]->updateWeights(dummy_grad, dummy_grad, dummy_grad, dummy_grad, learning_rate * 0.1f);
+                decoder_cross_attention[layer]->updateWeights(dummy_grad, dummy_grad, dummy_grad, dummy_grad, learning_rate * 0.1f);
+            }
+            
+            // 4. NUEVO: Actualizar componentes Feed-Forward
+            for (size_t layer = 0; layer < n_layers; ++layer) {
+                encoder_ffn[layer]->updateWeights(learning_rate * 0.1f);
+                decoder_ffn[layer]->updateWeights(learning_rate * 0.1f);
+            }
+            
             std::cout << "[UPDATE] Target embeddings actualizados exitosamente para " << last_target_tokens.size() << " tokens" << std::endl;
+            std::cout << "[UPDATE] Actualizados " << n_layers << " capas de Attention y FFN" << std::endl;
             
             // Log algunos valores de ejemplo para debug
             std::vector<float> sample_grads;

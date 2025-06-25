@@ -7,8 +7,9 @@ INCLUDES = -Iinclude -Isrc
 DATA_SOURCES = src/data/dataset.cu src/data/vocab.cu src/data/tsv_parser.cu
 UTILS_SOURCES = src/utils/matrix.cu
 TRANSFORMER_SOURCES = src/transformer/transformer.cu src/transformer/embeddings.cu
+LAYER_SOURCES = src/layers/multi_head_attention.cu src/layers/feed_forward.cu
 
-ALL_SOURCES = $(DATA_SOURCES) $(UTILS_SOURCES) $(TRANSFORMER_SOURCES)
+ALL_SOURCES = $(DATA_SOURCES) $(UTILS_SOURCES) $(TRANSFORMER_SOURCES) $(LAYER_SOURCES)
 
 # Main targets
 all: test_simple main_transformer
