@@ -184,8 +184,7 @@ Matrix Transformer::forward(const std::vector<int> &source_tokens,
         // Calculate cross-attention weights with proper softmax
         std::vector<float> cross_attention(source_tokens.size(), 0.0f);
         float max_score = -1e9f;
-        
-        // First pass: calculate raw attention scores
+          // First pass: calculate raw attention scores with positional bias
         for (int j = 0; j < source_tokens.size(); ++j) {
             float attention_score = 0.0f;
             int context_size = std::min(32, (int)d_model);
@@ -196,6 +195,22 @@ Matrix Transformer::forward(const std::vector<int> &source_tokens,
                 attention_score += decoder_val * encoder_val;
             }
             attention_score /= sqrtf(context_size); // Scale by sqrt(d_k)
+            
+            // ADD POSITIONAL BIAS to break the tie toward position 0
+            float positional_bias = 0.0f;
+            if (source_tokens.size() > 1) {
+                // Create different preferences for different target positions
+                float target_relative = (float)i / std::max(1.0f, (float)(target_tokens.size() - 1));
+                float source_relative = (float)j / std::max(1.0f, (float)(source_tokens.size() - 1));
+                
+                // Diagonal attention pattern (beginning matches beginning, end matches end)
+                positional_bias = 2.0f * (1.0f - abs(target_relative - source_relative));
+                
+                // Add some randomness based on position indices to break symmetry
+                positional_bias += sin((float)(i * 7 + j * 11)) * 0.5f;
+            }
+            
+            attention_score += positional_bias;
             cross_attention[j] = attention_score;
             max_score = std::max(max_score, attention_score);
         }
@@ -314,13 +329,10 @@ int sos_token, int eos_token, size_t max_length)
                     score -= 15.0f; // Discourage very early ending
                 }
             }
-            
-            // 3. Prevent immediate repetition of last 2 tokens
-            bool is_recent_repeat = false;
+              // 3. Prevent immediate repetition of last 2 tokens
             for (int i = std::max(1, (int)generated.size() - 2); i < generated.size(); i++) {
                 if (generated[i] == v) {
-                    score -= 5.0f;
-                    is_recent_repeat = true;
+                    score -= 5.0f; // Penalize recent repetitions
                     break;
                 }
             }

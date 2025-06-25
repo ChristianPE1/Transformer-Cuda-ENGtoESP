@@ -38,12 +38,20 @@ void Trainer::train(const std::vector<std::vector<int>>& source_batches, const s
             
             // 2. Loss simplificado
             double loss = loss_fn.forward(output, target);
-            std::cout << " [FAST-LOSS] batch:" << target_length << " classes:" << num_classes << " loss:" << std::fixed << std::setprecision(1) << loss;
-              // 3. Backward pass - AHORA SÍ ACTUALIZA LOS PESOS
+            std::cout << " [FAST-LOSS] batch:" << target_length << " classes:" << num_classes << " loss:" << std::fixed << std::setprecision(1) << loss;            // 3. Backward pass - AHORA SÍ ACTUALIZA LOS PESOS
             Matrix grad = loss_fn.backward(output, target);
             
-            // SIMPLE WEIGHT UPDATE - Usa el learning rate del optimizador
-            model.updateWeights(grad, optimizer.getLearningRate());
+            // DEBUG: Verificar learning rate
+            float lr = optimizer.getLearningRate();
+            std::cout << " [DEBUG-LR: " << lr << "]";
+            
+            // SIMPLE WEIGHT UPDATE - Usa un learning rate fijo si el optimizador falla
+            if (lr == 0.0f) {
+                std::cout << " [USANDO LR FIJO]";
+                model.updateWeights(grad, 0.02f); // Learning rate fijo como fallback
+            } else {
+                model.updateWeights(grad, lr);
+            }
             
             std::cout << " Loss: " << std::fixed << std::setprecision(1) << loss << std::endl;
               } catch (const std::exception& e) {
