@@ -3,8 +3,8 @@
 //#define ENCODER_H
 
 #include "common.cuh"
-#include "attention.cuh"
-#include "layers/feed_forward.cuh"
+#include "../layers/multi_head_attention.cuh"
+#include "../layers/feed_forward.cuh"
 #include "layers/layer_norm.cuh"
 #include <vector>
 
