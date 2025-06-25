@@ -79,13 +79,14 @@ public:
                 for (int j = 0; j < num_classes; ++j) {
                     softmax_probs[j] /= sum_exp;
                 }
-                
-                // Gradiente de cross-entropy: softmax_prob - target (one-hot)
+                  // Gradiente de cross-entropy: softmax_prob - target (one-hot)
                 for (int j = 0; j < num_classes; ++j) {
                     float gradient = softmax_probs[j];
                     if (j == target_class) {
                         gradient -= 1.0f; // Restar 1 para la clase correcta
                     }
+                    // AMPLIFICAR los gradientes para que tengan más impacto
+                    gradient *= 10.0f; // Multiplicar por 10 para mayor magnitud
                     grad.setElement(i, j, gradient / batch_size);
                 }
             }

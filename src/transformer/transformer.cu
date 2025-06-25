@@ -238,9 +238,8 @@ Matrix Transformer::forward(const std::vector<int> &source_tokens,
                 float decoder_val = decoder_output.getElement(i, d);
                 float vocab_val = vocab_embedding.getElement(0, d);
                 direct_similarity += decoder_val * vocab_val;
-            }
-            direct_similarity /= std::min(64, (int)d_model);
-            score += direct_similarity * 2.0f; // Weight this heavily
+            }            direct_similarity /= std::min(64, (int)d_model);
+            score += direct_similarity * 10.0f; // AMPLIFICAR para mayor contraste
             
             // 2. Source context contribution via cross-attention
             float source_context = 0.0f;
@@ -255,19 +254,18 @@ Matrix Transformer::forward(const std::vector<int> &source_tokens,
                     float src_val = src_embedding.getElement(0, d);
                     context_similarity += vocab_val * src_val;
                 }
-                source_context += cross_attention[j] * context_similarity;
-            }
-            score += source_context * 0.5f;
+                source_context += cross_attention[j] * context_similarity;            }
+            score += source_context * 2.0f; // AMPLIFICAR contexto
             
-            // 3. Position-aware bias (favor shorter, common words early)
-            if (i == 0 && v < 100) score += 0.2f; // Boost common words at start
-            if (i > 0 && v < 50) score += 0.1f;   // Moderate boost for common words
+            // 3. Position-aware bias MÁS AGRESIVO
+            if (i == 0 && v < 100) score += 1.0f; // Boost fuerte para palabras comunes al inicio
+            if (i > 0 && v < 50) score += 0.5f;   // Boost moderado para palabras comunes
             
-            // 4. Length preference (discourage very short/long sequences)
+            // 4. Length preference MÁS MARCADO
             int current_len = i + 1;
             int target_len = std::max(2, (int)(source_tokens.size() * 0.8));
-            if (current_len < target_len && v != 3) score += 0.05f; // Continue generating
-            if (current_len >= target_len && v == 3) score += 1.0f; // Favor EOS at right time
+            if (current_len < target_len && v != 3) score += 0.3f; // Continuar generando
+            if (current_len >= target_len && v == 3) score += 5.0f; // Favorecer MUCHO EOS al momento correcto
             
             output.setElement(i, v, score);
         }

@@ -155,27 +155,27 @@ __global__ void updateEmbeddingWeightsKernel(float* weights, float* gradients,
         if (token_id >= 0 && token_id < vocab_size) {
             int weight_idx = token_id * d_model + dim_idx;
             int grad_idx = token_idx * d_model + dim_idx;
+              float grad_value = gradients[grad_idx];
             
-            float grad_value = gradients[grad_idx];
-            
-            // More aggressive gradient clipping for stability
-            const float max_grad = 2.0f;
+            // SIMPLIFICAR: Permitir gradientes más grandes y actualización más directa
+            const float max_grad = 10.0f; // Aumentar límite
             if (grad_value > max_grad) grad_value = max_grad;
             if (grad_value < -max_grad) grad_value = -max_grad;
             
-            // Add L2 regularization
+            // Amplificar gradientes pequeños
+            if (abs(grad_value) < 0.01f && grad_value != 0.0f) {
+                grad_value *= 5.0f; // Amplificar gradientes pequeños
+            }
+            
+            // Actualización más directa y agresiva
             float current_weight = weights[weight_idx];
-            float l2_penalty = 0.001f * current_weight;
+            float update = learning_rate * grad_value;
             
-            // Improved update rule with momentum-like behavior
-            float update = learning_rate * (grad_value + l2_penalty);
+            weights[weight_idx] = current_weight - update;
             
-            // Exponential moving average style update for smoother convergence
-            weights[weight_idx] = current_weight * 0.95f - update;
-            
-            // Prevent weights from becoming too large
-            if (weights[weight_idx] > 5.0f) weights[weight_idx] = 5.0f;
-            if (weights[weight_idx] < -5.0f) weights[weight_idx] = -5.0f;
+            // Clipping de pesos menos restrictivo
+            if (weights[weight_idx] > 10.0f) weights[weight_idx] = 10.0f;
+            if (weights[weight_idx] < -10.0f) weights[weight_idx] = -10.0f;
         }
     }
 }
