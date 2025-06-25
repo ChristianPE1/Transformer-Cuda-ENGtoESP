@@ -19,7 +19,6 @@ MultiHeadAttention::MultiHeadAttention(size_t d_model, size_t num_heads)
 
 Matrix MultiHeadAttention::forward(const Matrix& query, const Matrix& key, const Matrix& value, bool use_causal_mask) {
     int seq_len = query.getRows();
-    int batch_size = 1; // Simplified for single sequence
     
     // 1. Linear transformations Q, K, V
     Matrix Q = query.multiply(W_q);
